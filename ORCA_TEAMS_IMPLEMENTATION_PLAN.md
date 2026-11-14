@@ -11,8 +11,8 @@
 | Fase       | Descripción                                               |     Estado     | Criterio de Salida                                                                                        |
 | ---------- | --------------------------------------------------------- | :------------: | --------------------------------------------------------------------------------------------------------- |
 | **Fase 0** | Auditoría de Arquitectura y Configuración del Repositorio | **Completada** | Repositorio independiente configurado, ramas `main`, `staging`, `develop` publicadas y CI inicial activo. |
-| **Fase 1** | Espacios de trabajo, equipos y proyectos                  |  **En Curso**  | Dos usuarios distintos pueden acceder al mismo proyecto con roles y permisos correctos.                   |
-| **Fase 2** | Kanban colaborativo en tiempo real                        |   Pendiente    | Movimientos sincronizados instantáneamente con Yjs sin pérdida ni sobrescritura.                          |
+| **Fase 1** | Espacios de trabajo, equipos y proyectos                  | **Completada** | Dos usuarios distintos pueden acceder al mismo proyecto con roles y permisos correctos.                   |
+| **Fase 2** | Kanban colaborativo en tiempo real                        |  **En Curso**  | Movimientos sincronizados instantáneamente con Yjs sin pérdida ni sobrescritura.                          |
 | **Fase 3** | Asignación y ejecución de agentes                         |   Pendiente    | Asignar tarjeta a un agente ejecuta tarea automáticamente con streaming de logs y feedback.               |
 | **Fase 4** | Whiteboard colaborativo                                   |   Pendiente    | Lienzo colaborativo en tiempo real con persistencia multiusuario.                                         |
 | **Fase 5** | Notes y documentación vinculada                           |   Pendiente    | Notas sincronizadas con guardado automático y vinculación a tarjetas Kanban.                              |
@@ -26,12 +26,16 @@
 | ------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------- | -------------------------------------------------------- | :------------: |
 | **#1** | [[Fase 1] Modelos de datos y contratos compartidos](https://github.com/FrancisCuarto/orca-teams/issues/1)      | Backend / Shared Engineer (Antigravity) | `feat/teams-fase1-models`        | [#5](https://github.com/FrancisCuarto/orca-teams/pull/5) | **Completado** |
 | **#2** | [[Fase 1] Esquema de Base de Datos y Persistencia](https://github.com/FrancisCuarto/orca-teams/issues/2)       | Database & Auth Engineer                | `feat/teams-fase1-db-auth`       | [#6](https://github.com/FrancisCuarto/orca-teams/pull/6) | **Completado** |
-| **#3** | [[Fase 1] UI: Selector y Gestión de Equipos y Proyectos](https://github.com/FrancisCuarto/orca-teams/issues/3) | Frontend Engineer                       | `feat/teams-fase1-ui-workspaces` | Pendiente                                                |  **En Curso**  |
-| **#4** | [[Fase 1] Flujo de Invitaciones y Enlaces Seguros](https://github.com/FrancisCuarto/orca-teams/issues/4)       | Security & API Engineer                 | `feat/teams-fase1-invitations`   | Pendiente                                                |   Pendiente    |
+| **#3** | [[Fase 1] UI: Selector y Gestión de Equipos y Proyectos](https://github.com/FrancisCuarto/orca-teams/issues/3) | Frontend Engineer                       | `feat/teams-fase1-ui-workspaces` | [#7](https://github.com/FrancisCuarto/orca-teams/pull/7) | **Completado** |
+| **#4** | [[Fase 1] Flujo de Invitaciones y Enlaces Seguros](https://github.com/FrancisCuarto/orca-teams/issues/4)       | Security & API Engineer                 | `feat/teams-fase1-invitations`   | [#8](https://github.com/FrancisCuarto/orca-teams/pull/8) | **Completado** |
 
 ---
 
 ## 3. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
+- `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
+- `src/shared/teamwork/team-database-service.test.ts`: **9/9 tests pasando**.
+- `src/shared/teamwork/team-invitation-service.test.ts`: **4/4 tests pasando**.
+- Total: **40/40 tests unitarios en verde**.
 - Workflow de CI: `.github/workflows/orca-teams-ci.yml` activo en `develop`.
