@@ -1,28 +1,22 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  AlertTriangle,
-  CheckSquare,
-  ChevronDown,
-  ChevronUp,
-  GitBranch,
-  Sparkles,
-  User,
-  Zap
-} from 'lucide-react'
+import { AlertTriangle, CheckSquare, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { AgentExecutionStatus } from '../../../../../shared/teamwork/team-workspace-types'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { TeamKanbanCardAgentBadge } from './TeamKanbanCardAgentBadge'
 
 type Props = {
   card: TeamKanbanCard
   columns?: TeamKanbanColumn[]
   onEdit: (card: TeamKanbanCard) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
+  executionStatus?: AgentExecutionStatus
+  onViewExecution?: (card: TeamKanbanCard) => void
   onToggleChecklistItem?: (cardId: string, itemId: string) => void
   onQuickMoveColumn?: (cardId: string, targetColId: string) => void
   isOverlay?: boolean
@@ -43,6 +37,8 @@ export function TeamKanbanCardItem({
   columns,
   onEdit,
   onDispatchAgent,
+  executionStatus,
+  onViewExecution,
   onToggleChecklistItem,
   onQuickMoveColumn,
   isOverlay = false
@@ -75,7 +71,7 @@ export function TeamKanbanCardItem({
           : 'border-border hover:border-ring/50'
       } ${isOverlay ? 'shadow-floating ring-2 ring-ring/50 rotate-1' : ''}`}
     >
-      {/* Top Header: Priority, Story Points & Quick Dispatch */}
+      {/* Top Header: Priority & Story Points */}
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <Badge variant={priority.variant} className="text-3xs px-1.5 py-0 h-4">
@@ -113,25 +109,6 @@ export function TeamKanbanCardItem({
                   </option>
                 ))}
               </select>
-            </div>
-          ) : null}
-
-          {onDispatchAgent ? (
-            <div className="opacity-80 group-hover:opacity-100 transition-opacity">
-              <Button
-                size="xs"
-                variant="ghost"
-                title="Despachar tarea a un Agente de IA"
-                className="h-5 px-1.5 gap-1 text-3xs"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDispatchAgent(card)
-                }}
-              >
-                <Zap className="size-3 text-git-graph-lane-1" />
-                <span>Agente</span>
-              </Button>
             </div>
           ) : null}
         </div>
@@ -232,22 +209,13 @@ export function TeamKanbanCardItem({
           <div />
         )}
 
-        {card.assignee ? (
-          <div
-            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-medium ${
-              card.assignee.type === 'agent'
-                ? 'bg-accent text-accent-foreground border border-border'
-                : 'bg-muted text-muted-foreground'
-            }`}
-          >
-            {card.assignee.type === 'agent' ? (
-              <Sparkles className="size-2.5 text-git-graph-lane-5" />
-            ) : (
-              <User className="size-2.5" />
-            )}
-            <span className="truncate max-w-[90px]">{card.assignee.name}</span>
-          </div>
-        ) : null}
+        <TeamKanbanCardAgentBadge
+          card={card}
+          assignee={card.assignee}
+          executionStatus={executionStatus}
+          onDispatchAgent={onDispatchAgent}
+          onViewExecution={onViewExecution}
+        />
       </div>
 
       {/* Expandable Checklist Items */}
