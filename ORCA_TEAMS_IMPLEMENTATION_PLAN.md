@@ -15,7 +15,7 @@
 | **Fase 2** | Kanban colaborativo en tiempo real                        | **Completada** | Movimientos sincronizados instantáneamente con Yjs sin pérdida ni sobrescritura.                          |
 | **Fase 3** | Asignación y ejecución de agentes                         | **Completada** | Asignar tarjeta a un agente ejecuta tarea automáticamente con streaming de logs y feedback.               |
 | **Fase 4** | Whiteboard colaborativo                                   | **Completada** | Lienzo colaborativo en tiempo real con persistencia multiusuario.                                         |
-| **Fase 5** | Notes y documentación vinculada                           |  **En Curso**  | Notas sincronizadas con guardado automático y vinculación a tarjetas Kanban.                              |
+| **Fase 5** | Notes y documentación vinculada                           | **Completada** | Notas sincronizadas con guardado automático y vinculación a tarjetas Kanban.                              |
 | **Fase 6** | Integración global y empaquetado                          |   Pendiente    | Build instalable de escritorio (`orca-teams`) con suite de pruebas completa en verde.                     |
 
 ---
@@ -63,11 +63,11 @@
 
 ## 6. Issues y Asignación de Tareas — Fase 5 (Notes y Documentación Colaborativa)
 
-| Issue   | Título                                                                                                         | Agente / Rol Asignado                  | Rama Asociada             | PR        |    Estado    |
-| ------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- | --------- | :----------: |
-| **#31** | [[Fase 5] Motor CRDT para Notas y Documentación (Yjs)](https://github.com/FrancisCuarto/orca-teams/issues/31)  | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase5-notes`  | Pendiente | **En Curso** |
-| **#32** | [[Fase 5] Hook Reactivo useTeamNotesSync y Tiempo Real](https://github.com/FrancisCuarto/orca-teams/issues/32) | Frontend Realtime Engineer             | `feat/teams-fase5-hook`   | Pendiente |  Pendiente   |
-| **#33** | [[Fase 5] Editor Colaborativo y Vinculación con Kanban](https://github.com/FrancisCuarto/orca-teams/issues/33) | UI & Collaboration Engineer            | `feat/teams-fase5-editor` | Pendiente |  Pendiente   |
+| Issue   | Título                                                                                                         | Agente / Rol Asignado                  | Rama Asociada             | PR                                                         |     Estado     |
+| ------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- | ---------------------------------------------------------- | :------------: |
+| **#31** | [[Fase 5] Motor CRDT para Notas y Documentación (Yjs)](https://github.com/FrancisCuarto/orca-teams/issues/31)  | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase5-notes`  | [#34](https://github.com/FrancisCuarto/orca-teams/pull/34) | **Completado** |
+| **#32** | [[Fase 5] Hook Reactivo useTeamNotesSync y Tiempo Real](https://github.com/FrancisCuarto/orca-teams/issues/32) | Frontend Realtime Engineer             | `feat/teams-fase5-hook`   | [#35](https://github.com/FrancisCuarto/orca-teams/pull/35) | **Completado** |
+| **#33** | [[Fase 5] Editor Colaborativo y Vinculación con Kanban](https://github.com/FrancisCuarto/orca-teams/issues/33) | UI & Collaboration Engineer            | `feat/teams-fase5-editor` | [#36](https://github.com/FrancisCuarto/orca-teams/pull/36) | **Completado** |
 
 ---
 
@@ -86,5 +86,8 @@
 - `src/shared/teamwork/realtime/team-crdt-whiteboard.test.ts`: **7/7 tests pasando**.
 - `src/renderer/src/components/team/hooks/use-team-whiteboard-sync.test.ts`: **5/5 tests pasando**.
 - `src/renderer/src/components/team/whiteboard/TeamWhiteboardCursor.test.tsx`: **2/2 tests pasando**.
-- Total: **82/82 tests unitarios en verde**.
+- `src/shared/teamwork/realtime/team-crdt-notes.test.ts`: **7/7 tests pasando**.
+- `src/renderer/src/components/team/hooks/use-team-notes-sync.test.ts`: **5/5 tests pasando**.
+- `src/renderer/src/components/team/notes/TeamNotesView.test.tsx`: **4/4 tests pasando**.
+- Total: **98/98 tests unitarios en verde**.
 - Workflow de CI: `.github/workflows/orca-teams-ci.yml` activo en `develop`.
