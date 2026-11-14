@@ -1,4 +1,10 @@
-import type { TeamKanbanBoard, TeamKanbanCard, TeamKanbanColumn } from '../team-kanban-types'
+import type {
+  TeamKanbanBoard,
+  TeamKanbanCard,
+  TeamKanbanColumn,
+  TeamWhiteboard,
+  TeamWhiteboardItem
+} from '../team-kanban-types'
 
 export type CollaboratorPresence = {
   userId: string
@@ -30,6 +36,29 @@ export type ITeamBoardCRDT = {
   deleteCard(cardId: string): void
   moveCard(cardId: string, targetColumnId: string, newIndex?: number): void
   setColumns(columns: TeamKanbanColumn[]): void
+  encodeStateAsUpdate(): Uint8Array
+  applyUpdate(update: Uint8Array, origin?: unknown): void
+  destroy(): void
+}
+
+export type WhiteboardCursorPresence = {
+  userId: string
+  displayName: string
+  color: string
+  x: number
+  y: number
+  lastSeen: number
+}
+
+export type ITeamWhiteboardCRDT = {
+  readonly docId: string
+  getWhiteboard(): TeamWhiteboard
+  initializeFromWhiteboard(whiteboard: TeamWhiteboard): void
+  upsertItem(item: TeamWhiteboardItem): void
+  moveItem(itemId: string, x: number, y: number): void
+  updateItemContent(itemId: string, content: string): void
+  deleteItem(itemId: string): void
+  setViewport(viewport: { x: number; y: number; zoom: number }): void
   encodeStateAsUpdate(): Uint8Array
   applyUpdate(update: Uint8Array, origin?: unknown): void
   destroy(): void
