@@ -43,7 +43,11 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          if [ -d node_modules/bun ]; then
+            pnpm rebuild bun
+          fi
 
       - name: Run Teams Unit Tests
         run: |
