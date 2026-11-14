@@ -8,7 +8,7 @@ import {
   extractActionItemsFromMarkdownToBoard
 } from './kanban/team-kanban-board-mutations'
 import { TeamKanbanBoardView } from './kanban/TeamKanbanBoardView'
-import { TeamWhiteboardView } from './whiteboard/TeamWhiteboardView'
+import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
 import { TeamNotesView } from './notes/TeamNotesView'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
 import { Button } from '@/components/ui/button'
@@ -222,10 +222,17 @@ export default function TeamPage(): React.JSX.Element {
             onChange={handleBoardChange}
           />
         ) : activeTab === 'whiteboard' && whiteboard ? (
-          <TeamWhiteboardView
+          <TeamWhiteboardConnectedView
             key={currentProject?.id}
-            whiteboard={whiteboard}
-            onChange={handleWhiteboardChange}
+            whiteboardId={currentProject?.id ?? 'wb-default'}
+            projectId={currentProject?.id ?? 'proj-default'}
+            initialWhiteboard={whiteboard}
+            currentUser={{
+              userId: 'usr-francis',
+              displayName: 'Francis (Lead)',
+              color: '#10b981'
+            }}
+            onPersist={handleWhiteboardChange}
           />
         ) : activeTab === 'notes' && notes ? (
           <TeamNotesView
