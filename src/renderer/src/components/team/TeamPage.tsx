@@ -9,7 +9,7 @@ import {
 } from './kanban/team-kanban-board-mutations'
 import { TeamKanbanBoardView } from './kanban/TeamKanbanBoardView'
 import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
-import { TeamNotesView } from './notes/TeamNotesView'
+import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
@@ -235,10 +235,16 @@ export default function TeamPage(): React.JSX.Element {
             onPersist={handleWhiteboardChange}
           />
         ) : activeTab === 'notes' && notes ? (
-          <TeamNotesView
+          <TeamNotesConnectedView
             key={currentProject?.id}
-            notesCollection={notes}
-            onChange={handleNotesChange}
+            projectId={currentProject?.id ?? 'proj-default'}
+            initialNotes={notes}
+            currentUser={{
+              userId: 'usr-francis',
+              displayName: 'Francis (Lead)',
+              color: '#8b5cf6'
+            }}
+            onPersist={handleNotesChange}
             onExtractTasksToKanban={handleExtractTasksToKanban}
           />
         ) : null}
