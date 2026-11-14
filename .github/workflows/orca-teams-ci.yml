@@ -43,8 +43,12 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          if [ -d node_modules/bun ]; then
+            pnpm rebuild bun
+          fi
 
       - name: Run Teams Unit Tests
         run: |
-          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts
+          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts src/shared/teamwork/team-workspace-types.test.ts
