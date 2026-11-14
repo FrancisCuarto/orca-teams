@@ -15,14 +15,18 @@ import {
 import { teamSchemaStatements } from './team-schema'
 import { TeamExecutionService } from './team-execution-service'
 import { TeamInvitationService } from './team-invitation-service'
+import { TeamProjectService } from './team-project-service'
+import { mapTeamRow } from './team-row-mappers'
 
 export class TeamDatabaseService {
   private readonly executions: TeamExecutionService
   private readonly invitations: TeamInvitationService
+  private readonly projects: TeamProjectService
 
   constructor(private readonly db: DatabaseSync) {
     this.executions = new TeamExecutionService(db)
     this.invitations = new TeamInvitationService(db, (t, u) => this.getTeamMemberRole(t, u))
+    this.projects = new TeamProjectService(db, (t, u) => this.getTeamMemberRole(t, u))
   }
 
   initSchema(): void {
@@ -82,15 +86,7 @@ export class TeamDatabaseService {
       return null
     }
 
-    return {
-      id: String(row.id),
-      name: String(row.name),
-      slug: String(row.slug),
-      ownerId: String(row.owner_id),
-      description: row.description ? String(row.description) : undefined,
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at)
-    }
+    return mapTeamRow(row)
   }
 
   getTeamMemberRole(teamId: string, userId: string): TeamRole | null {
@@ -112,15 +108,7 @@ export class TeamDatabaseService {
     )
     const rows = query.all(userId) as Record<string, unknown>[]
     return rows.map((row) => ({
-      team: {
-        id: String(row.id),
-        name: String(row.name),
-        slug: String(row.slug),
-        ownerId: String(row.owner_id),
-        description: row.description ? String(row.description) : undefined,
-        createdAt: Number(row.created_at),
-        updatedAt: Number(row.updated_at)
-      },
+      team: mapTeamRow(row),
       role: isTeamRole(row.member_role) ? row.member_role : 'viewer'
     }))
   }
@@ -154,7 +142,7 @@ export class TeamDatabaseService {
     }
   }
 
-  // --- Proyectos (Projects) ---
+  // --- Proyectos (Projects) - Delegación a TeamProjectService ---
 
   createProject(options: {
     id: string
@@ -165,92 +153,15 @@ export class TeamDatabaseService {
     visibility: ProjectVisibility
     actorUserId: string
   }): Project {
-    const actorRole = this.getTeamMemberRole(options.teamId, options.actorUserId)
-    if (!actorRole || !hasTeamPermission(actorRole, 'member')) {
-      throw new Error(
-        'Permisos insuficientes: se requiere rol member o superior para crear proyectos'
-      )
-    }
-
-    const now = Date.now()
-    const project: Project = {
-      id: options.id,
-      teamId: options.teamId,
-      name: options.name,
-      slug: options.slug,
-      description: options.description,
-      visibility: options.visibility,
-      createdAt: now,
-      updatedAt: now
-    }
-
-    const insertProject = this.db.prepare(
-      `INSERT INTO projects (id, team_id, name, slug, description, visibility, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    insertProject.run(
-      project.id,
-      project.teamId,
-      project.name,
-      project.slug,
-      project.description ?? null,
-      project.visibility,
-      project.createdAt,
-      project.updatedAt
-    )
-
-    if (project.visibility === 'private') {
-      const insertProjMember = this.db.prepare(
-        `INSERT INTO project_members (project_id, user_id, role, joined_at)
-         VALUES (?, ?, ?, ?)`
-      )
-      insertProjMember.run(project.id, options.actorUserId, 'owner', now)
-    }
-
-    return project
+    return this.projects.createProject(options)
   }
 
   getProject(projectId: string): Project | null {
-    const query = this.db.prepare(`SELECT * FROM projects WHERE id = ?`)
-    const row = query.get(projectId) as Record<string, unknown> | undefined
-    if (!row) {
-      return null
-    }
-
-    return {
-      id: String(row.id),
-      teamId: String(row.team_id),
-      name: String(row.name),
-      slug: String(row.slug),
-      description: row.description ? String(row.description) : undefined,
-      visibility: row.visibility === 'private' ? 'private' : 'team',
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at)
-    }
+    return this.projects.getProject(projectId)
   }
 
   listProjectsForUser(options: { teamId: string; userId: string }): Project[] {
-    const teamRole = this.getTeamMemberRole(options.teamId, options.userId)
-    if (!teamRole) {
-      throw new Error('Acceso denegado: el usuario no pertenece a este equipo')
-    }
-
-    if (hasTeamPermission(teamRole, 'admin')) {
-      const query = this.db.prepare(
-        `SELECT * FROM projects WHERE team_id = ? ORDER BY created_at DESC`
-      )
-      const rows = query.all(options.teamId) as Record<string, unknown>[]
-      return rows.map((r) => this.mapProjectRow(r))
-    }
-
-    const query = this.db.prepare(
-      `SELECT DISTINCT p.* FROM projects p
-       LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_id = ?
-       WHERE p.team_id = ? AND (p.visibility = 'team' OR pm.user_id IS NOT NULL)
-       ORDER BY p.created_at DESC`
-    )
-    const rows = query.all(options.userId, options.teamId) as Record<string, unknown>[]
-    return rows.map((r) => this.mapProjectRow(r))
+    return this.projects.listProjectsForUser(options)
   }
 
   canUserAccessProject(options: {
@@ -258,38 +169,10 @@ export class TeamDatabaseService {
     userId: string
     requiredRole?: TeamRole
   }): boolean {
-    const project = this.getProject(options.projectId)
-    if (!project) {
-      return false
-    }
-
-    const teamRole = this.getTeamMemberRole(project.teamId, options.userId)
-    if (!teamRole) {
-      return false
-    }
-
-    const reqRole = options.requiredRole ?? 'viewer'
-
-    if (hasTeamPermission(teamRole, 'admin')) {
-      return hasTeamPermission(teamRole, reqRole)
-    }
-
-    if (project.visibility === 'team') {
-      return hasTeamPermission(teamRole, reqRole)
-    }
-
-    const query = this.db.prepare(
-      `SELECT role FROM project_members WHERE project_id = ? AND user_id = ?`
-    )
-    const row = query.get(options.projectId, options.userId) as Record<string, unknown> | undefined
-    if (!row || !isTeamRole(row.role)) {
-      return false
-    }
-
-    return hasTeamPermission(row.role, reqRole)
+    return this.projects.canUserAccessProject(options)
   }
 
-  // --- Invitaciones (Invitations) ---
+  // --- Invitaciones (Invitations) - Delegación a TeamInvitationService ---
 
   createInvitation(options: {
     id: string
@@ -307,7 +190,15 @@ export class TeamDatabaseService {
     return this.invitations.acceptInvitation(token, userId)
   }
 
-  // --- Delegación a TeamExecutionService ---
+  getInvitationByToken(token: string): TeamInvitation | null {
+    return this.invitations.getInvitationByToken(token)
+  }
+
+  revokeInvitation(options: { invitationId: string; actorUserId: string }): void {
+    this.invitations.revokeInvitation(options)
+  }
+
+  // --- Ejecuciones (Executions) - Delegación a TeamExecutionService ---
 
   recordAgentExecution(record: AgentExecutionRecord): AgentExecutionRecord {
     return this.executions.recordAgentExecution(record)
@@ -328,18 +219,5 @@ export class TeamDatabaseService {
 
   appendAgentExecutionLog(executionId: string, log: AgentExecutionLog): void {
     this.executions.appendAgentExecutionLog(executionId, log)
-  }
-
-  private mapProjectRow(row: Record<string, unknown>): Project {
-    return {
-      id: String(row.id),
-      teamId: String(row.team_id),
-      name: String(row.name),
-      slug: String(row.slug),
-      description: row.description ? String(row.description) : undefined,
-      visibility: row.visibility === 'private' ? 'private' : 'team',
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at)
-    }
   }
 }

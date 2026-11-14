@@ -100,4 +100,44 @@ export class TeamInvitationService {
       joinedAt: now
     }
   }
+
+  getInvitationByToken(token: string): TeamInvitation | null {
+    const query = this.db.prepare(`SELECT * FROM team_invitations WHERE token = ?`)
+    const row = query.get(token) as Record<string, unknown> | undefined
+    if (!row) {
+      return null
+    }
+
+    return {
+      id: String(row.id),
+      teamId: String(row.team_id),
+      email: String(row.email),
+      role: isTeamRole(row.role) ? row.role : 'member',
+      token: String(row.token),
+      invitedBy: String(row.invited_by),
+      status: String(row.status) as InvitationStatus,
+      expiresAt: Number(row.expires_at),
+      createdAt: Number(row.created_at)
+    }
+  }
+
+  revokeInvitation(options: { invitationId: string; actorUserId: string }): void {
+    const query = this.db.prepare(`SELECT * FROM team_invitations WHERE id = ?`)
+    const row = query.get(options.invitationId) as Record<string, unknown> | undefined
+    if (!row) {
+      throw new Error('Invitación no encontrada')
+    }
+
+    const teamId = String(row.team_id)
+    const actorRole = this.getRole(teamId, options.actorUserId)
+    if (!actorRole || !hasTeamPermission(actorRole, 'admin')) {
+      throw new Error(
+        'Permisos insuficientes: se requiere rol admin u owner para revocar invitaciones'
+      )
+    }
+
+    this.db
+      .prepare(`UPDATE team_invitations SET status = 'revoked' WHERE id = ?`)
+      .run(options.invitationId)
+  }
 }
