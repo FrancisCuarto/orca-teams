@@ -61,7 +61,17 @@
 
 ---
 
-## 6. Registro de Pruebas y Validación Continua
+## 6. Issues y Asignación de Tareas — Fase 5 (Notes y Documentación Colaborativa)
+
+| Issue   | Título                                                                                                         | Agente / Rol Asignado                  | Rama Asociada             | PR        |    Estado    |
+| ------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- | --------- | :----------: |
+| **#31** | [[Fase 5] Motor CRDT para Notas y Documentación (Yjs)](https://github.com/FrancisCuarto/orca-teams/issues/31)  | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase5-notes`  | Pendiente | **En Curso** |
+| **#32** | [[Fase 5] Hook Reactivo useTeamNotesSync y Tiempo Real](https://github.com/FrancisCuarto/orca-teams/issues/32) | Frontend Realtime Engineer             | `feat/teams-fase5-hook`   | Pendiente |  Pendiente   |
+| **#33** | [[Fase 5] Editor Colaborativo y Vinculación con Kanban](https://github.com/FrancisCuarto/orca-teams/issues/33) | UI & Collaboration Engineer            | `feat/teams-fase5-editor` | Pendiente |  Pendiente   |
+
+---
+
+## 7. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
