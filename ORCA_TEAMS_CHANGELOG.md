@@ -34,4 +34,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 - **Fase 2 — Infraestructura y Provider CRDT (Issue #10 / PR #13)**:
   - Motor de sincronización colaborativa `TeamBoardCRDT` basado en Yjs (`Y.Doc`, `Y.Map`, `Y.Array`) con transacciones atómicas para mutaciones de tarjetas y columnas.
   - Capa de sala `TeamRoomProvider` para intercambio de presencias de colaboradores y propagación de deltas binarios sin servidor centralizado obligatorio.
-  - Suite de 5 pruebas unitarias en `src/shared/teamwork/realtime/team-crdt-board.test.ts` validando convergencia de estado y resolución sin conflictos (45/45 tests pasando en total).
+  - Suite de 5 pruebas unitarias en `src/shared/teamwork/realtime/team-crdt-board.test.ts` validando convergencia de estado y resolución sin conflictos.
+- **Fase 2 — Hook Reactivo y Sincronización del Tablero Kanban (Issue #11 / PR #14)**:
+  - Hook `useTeamKanbanSync` conectando el estado reactivo de React con el motor CRDT y presencias del Room Provider.
+  - Operaciones atómicas (`upsertCard`, `moveCard`, `deleteCard`, `updateActiveCard`) con limpieza automática de heartbeat y recursos en desmontaje.
+  - Suite de 5 pruebas unitarias en `src/renderer/src/components/team/hooks/use-team-kanban-sync.test.ts` con `@testing-library/react` y `happy-dom`.
+- **Fase 2 — Indicadores de Presencia en Vivo y Reconciliación (Issue #12 / PR #15)**:
+  - Componente `TeamBoardPresenceBar` para visualización en tiempo real de colaboradores conectados, tarjetas activas y estado de sincronización cumpliendo el sistema de diseño de Orca.
+  - Suite de 2 pruebas de concurrencia y particiones de red en `src/shared/teamwork/realtime/team-crdt-concurrency.test.ts` demostrando convergencia determinista entre 3 clientes aislados (52/52 tests unitarios pasando).
