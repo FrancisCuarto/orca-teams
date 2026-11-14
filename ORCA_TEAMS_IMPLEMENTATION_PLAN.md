@@ -31,7 +31,17 @@
 
 ---
 
-## 3. Registro de Pruebas y Validación Continua
+## 3. Issues y Asignación de Tareas — Fase 2 (Kanban Colaborativo en Tiempo Real)
+
+| Issue   | Título                                                                                                                  | Agente / Rol Asignado                  | Rama Asociada            | PR        |    Estado    |
+| ------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------ | --------- | :----------: |
+| **#10** | [[Fase 2] Infraestructura y Provider CRDT (Yjs / Room Provider)](https://github.com/FrancisCuarto/orca-teams/issues/10) | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase2-crdt`  | Pendiente | **En Curso** |
+| **#11** | [[Fase 2] Hook Reactivo y Sincronización del Tablero Kanban](https://github.com/FrancisCuarto/orca-teams/issues/11)     | Frontend Realtime Engineer             | `feat/teams-fase2-hook`  | Pendiente |  Pendiente   |
+| **#12** | [[Fase 2] Indicadores de Presencia en Vivo y Reconciliación](https://github.com/FrancisCuarto/orca-teams/issues/12)     | QA & Collaboration Engineer            | `feat/teams-fase2-recon` | Pendiente |  Pendiente   |
+
+---
+
+## 4. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
