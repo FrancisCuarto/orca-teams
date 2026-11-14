@@ -31,3 +31,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
   - Componente modal `AcceptInvitationDialog` para aceptación fluida de invitaciones respetando tokens de diseño de Orca y Shadcn.
   - Suite de 4 pruebas unitarias para ciclo de vida de invitaciones en `src/shared/teamwork/team-invitation-service.test.ts`.
   - Modularización de persistencia extrayendo `TeamProjectService` y `team-row-mappers.ts`.
+- **Fase 2 — Infraestructura y Provider CRDT (Issue #10 / PR #13)**:
+  - Motor de sincronización colaborativa `TeamBoardCRDT` basado en Yjs (`Y.Doc`, `Y.Map`, `Y.Array`) con transacciones atómicas para mutaciones de tarjetas y columnas.
+  - Capa de sala `TeamRoomProvider` para intercambio de presencias de colaboradores y propagación de deltas binarios sin servidor centralizado obligatorio.
+  - Suite de 5 pruebas unitarias en `src/shared/teamwork/realtime/team-crdt-board.test.ts` validando convergencia de estado y resolución sin conflictos (45/45 tests pasando en total).

@@ -33,11 +33,11 @@
 
 ## 3. Issues y Asignación de Tareas — Fase 2 (Kanban Colaborativo en Tiempo Real)
 
-| Issue   | Título                                                                                                                  | Agente / Rol Asignado                  | Rama Asociada            | PR        |    Estado    |
-| ------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------ | --------- | :----------: |
-| **#10** | [[Fase 2] Infraestructura y Provider CRDT (Yjs / Room Provider)](https://github.com/FrancisCuarto/orca-teams/issues/10) | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase2-crdt`  | Pendiente | **En Curso** |
-| **#11** | [[Fase 2] Hook Reactivo y Sincronización del Tablero Kanban](https://github.com/FrancisCuarto/orca-teams/issues/11)     | Frontend Realtime Engineer             | `feat/teams-fase2-hook`  | Pendiente |  Pendiente   |
-| **#12** | [[Fase 2] Indicadores de Presencia en Vivo y Reconciliación](https://github.com/FrancisCuarto/orca-teams/issues/12)     | QA & Collaboration Engineer            | `feat/teams-fase2-recon` | Pendiente |  Pendiente   |
+| Issue   | Título                                                                                                                  | Agente / Rol Asignado                  | Rama Asociada            | PR                                                         |     Estado     |
+| ------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------ | ---------------------------------------------------------- | :------------: |
+| **#10** | [[Fase 2] Infraestructura y Provider CRDT (Yjs / Room Provider)](https://github.com/FrancisCuarto/orca-teams/issues/10) | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase2-crdt`  | [#13](https://github.com/FrancisCuarto/orca-teams/pull/13) | **Completado** |
+| **#11** | [[Fase 2] Hook Reactivo y Sincronización del Tablero Kanban](https://github.com/FrancisCuarto/orca-teams/issues/11)     | Frontend Realtime Engineer             | `feat/teams-fase2-hook`  | Pendiente                                                  |  **En Curso**  |
+| **#12** | [[Fase 2] Indicadores de Presencia en Vivo y Reconciliación](https://github.com/FrancisCuarto/orca-teams/issues/12)     | QA & Collaboration Engineer            | `feat/teams-fase2-recon` | Pendiente                                                  |   Pendiente    |
 
 ---
 
@@ -47,5 +47,6 @@
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
 - `src/shared/teamwork/team-database-service.test.ts`: **9/9 tests pasando**.
 - `src/shared/teamwork/team-invitation-service.test.ts`: **4/4 tests pasando**.
-- Total: **40/40 tests unitarios en verde**.
+- `src/shared/teamwork/realtime/team-crdt-board.test.ts`: **5/5 tests pasando**.
+- Total: **45/45 tests unitarios en verde**.
 - Workflow de CI: `.github/workflows/orca-teams-ci.yml` activo en `develop`.
