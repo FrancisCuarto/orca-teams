@@ -36,17 +36,26 @@ chmod +x "$TARGET_APP_DIR/orca-ide"
 
 echo "🎨 2. Instalando iconos de Orca Teams..."
 mkdir -p "$ICONS_DIR" "$PIXMAPS_DIR"
-cp "$SCRIPT_DIR/resources/build/icon.png" "$ICONS_DIR/orca-teams.png"
-cp "$SCRIPT_DIR/resources/build/icon.png" "$PIXMAPS_DIR/orca-teams.png"
-for s in 16 24 32 48 64 128 256; do
-    s_dir="$HOME/.local/share/icons/hicolor/${s}x${s}/apps"
-    mkdir -p "$s_dir"
-    if [ -f "$HOME/.local/share/icons/hicolor/${s}x${s}/apps/orca-teams.png" ]; then
-        true
-    else
-        cp "$SCRIPT_DIR/resources/icon.png" "$s_dir/orca-teams.png" 2>/dev/null || true
-    fi
-done
+cp -f "$SCRIPT_DIR/resources/build/icon.png" "$ICONS_DIR/orca-teams.png"
+cp -f "$SCRIPT_DIR/resources/build/icon.png" "$PIXMAPS_DIR/orca-teams.png"
+if command -v python3 >/dev/null 2>&1 && python3 -c "import PIL" 2>/dev/null; then
+    python3 - "$SCRIPT_DIR/resources/build/icon.png" << 'PYEOF'
+import os, sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert('RGBA')
+home = os.path.expanduser('~')
+for s in [16, 24, 32, 48, 64, 128, 256, 512]:
+    s_dir = os.path.join(home, f'.local/share/icons/hicolor/{s}x{s}/apps')
+    os.makedirs(s_dir, exist_ok=True)
+    im.resize((s, s), Image.Resampling.LANCZOS).save(os.path.join(s_dir, 'orca-teams.png'))
+PYEOF
+else
+    for s in 16 24 32 48 64 128 256; do
+        s_dir="$HOME/.local/share/icons/hicolor/${s}x${s}/apps"
+        mkdir -p "$s_dir"
+        cp -f "$SCRIPT_DIR/resources/icon.png" "$s_dir/orca-teams.png" 2>/dev/null || true
+    done
+fi
 
 echo "🔗 3. Creando lanzador en línea de comandos ($BIN_DIR/orca-teams)..."
 mkdir -p "$BIN_DIR"
