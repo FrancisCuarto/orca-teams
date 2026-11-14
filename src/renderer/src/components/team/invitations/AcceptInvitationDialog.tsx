@@ -25,7 +25,7 @@ export function AcceptInvitationDialog({
   invitation,
   onOpenChange,
   onAccept
-}: Props): React.JSX.Element {
+}: Props): React.JSX.Element | null {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accepted, setAccepted] = useState(false)

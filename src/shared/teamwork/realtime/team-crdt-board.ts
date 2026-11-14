@@ -41,6 +41,7 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
     const projectId = typeof metadata.projectId === 'string' ? metadata.projectId : undefined
     const sprintGoal = typeof metadata.sprintGoal === 'string' ? metadata.sprintGoal : undefined
     const updatedAt = typeof metadata.updatedAt === 'number' ? metadata.updatedAt : Date.now()
+    const createdAt = typeof metadata.createdAt === 'number' ? metadata.createdAt : updatedAt
 
     return {
       id: this.docId,
@@ -50,6 +51,7 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
       sprintGoal,
       columns,
       cards: rawCards,
+      createdAt,
       updatedAt
     }
   }
@@ -70,6 +72,7 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
       if (board.sprintGoal) {
         this.metadataMap.set('sprintGoal', board.sprintGoal)
       }
+      this.metadataMap.set('createdAt', board.createdAt ?? board.updatedAt)
       this.metadataMap.set('updatedAt', board.updatedAt)
 
       this.columnsArray.delete(0, this.columnsArray.length)

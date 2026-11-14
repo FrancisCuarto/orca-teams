@@ -35,7 +35,7 @@ export function TeamAgentExecutionModal({
   execution,
   onOpenChange,
   onCancel
-}: Props): React.JSX.Element {
+}: Props): React.JSX.Element | null {
   const logsEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
