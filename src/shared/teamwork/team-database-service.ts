@@ -208,6 +208,10 @@ export class TeamDatabaseService {
     return this.executions.getAgentExecution(executionId)
   }
 
+  getLatestExecutionForTask(taskId: string): AgentExecutionRecord | null {
+    return this.executions.getLatestExecutionForTask(taskId)
+  }
+
   updateAgentExecutionStatus(options: {
     executionId: string
     status: AgentExecutionStatus
