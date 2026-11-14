@@ -1,0 +1,96 @@
+// @vitest-environment happy-dom
+import { describe, expect, it, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
+import type { AgentExecutionRecord } from '../../../../../shared/teamwork/team-workspace-types'
+
+function createSampleExecution(status: AgentExecutionRecord['status']): AgentExecutionRecord {
+  return {
+    id: 'exec-test-1',
+    taskId: 'card-1',
+    projectId: 'proj-1',
+    agentId: 'Codex',
+    agentType: 'orchestration',
+    model: 'claude-3-5-sonnet',
+    status,
+    prompt: '# Prompt test',
+    branchOrWorktree: 'feat/test-branch',
+    idempotencyKey: 'key-1',
+    logs: [
+      { timestamp: 1000, level: 'info', message: 'Iniciando tarea agéntica...' },
+      { timestamp: 2000, level: 'warn', message: 'Advertencia detectada.' },
+      { timestamp: 3000, level: 'error', message: 'Fallo temporal recuperado.' }
+    ],
+    outputSummary: status === 'completed' ? 'Cambios aplicados con éxito.' : undefined,
+    createdAt: 1000,
+    updatedAt: 3000
+  }
+}
+
+describe('TeamAgentExecutionModal', () => {
+  it('no renderiza nada si execution es null', () => {
+    const { container } = render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Tarjeta Test"
+        execution={null}
+        onOpenChange={vi.fn()}
+      />
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('renderiza metadatos del agente, rama y logs en streaming', () => {
+    const execution = createSampleExecution('running')
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Crear endpoint"
+        execution={execution}
+        onOpenChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Ejecución Agéntica: Crear endpoint')).toBeDefined()
+    expect(screen.getByText('Codex')).toBeDefined()
+    expect(screen.getByText('(claude-3-5-sonnet)')).toBeDefined()
+    expect(screen.getByText('feat/test-branch')).toBeDefined()
+    expect(screen.getByText('Iniciando tarea agéntica...')).toBeDefined()
+    expect(screen.getByText('Advertencia detectada.')).toBeDefined()
+    expect(screen.getByText('Fallo temporal recuperado.')).toBeDefined()
+  })
+
+  it('muestra el resumen de salida cuando la ejecución está completada', () => {
+    const execution = createSampleExecution('completed')
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Crear endpoint"
+        execution={execution}
+        onOpenChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Resumen de Salida')).toBeDefined()
+    expect(screen.getByText('Cambios aplicados con éxito.')).toBeDefined()
+  })
+
+  it('permite cancelar la ejecución en curso llamando onCancel', () => {
+    const execution = createSampleExecution('running')
+    const onCancel = vi.fn()
+
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Crear endpoint"
+        execution={execution}
+        onOpenChange={vi.fn()}
+        onCancel={onCancel}
+      />
+    )
+
+    const cancelBtn = screen.getByText('Cancelar Ejecución')
+    fireEvent.click(cancelBtn)
+    expect(onCancel).toHaveBeenCalledWith('exec-test-1')
+  })
+})

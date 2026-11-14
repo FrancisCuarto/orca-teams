@@ -6,6 +6,7 @@ import type {
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { AgentExecutionStatus } from '../../../../../shared/teamwork/team-workspace-types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,10 +18,12 @@ type Props = {
   cards: TeamKanbanCard[]
   columns?: TeamKanbanColumn[]
   canDelete?: boolean
+  cardExecutions?: Record<string, AgentExecutionStatus>
   onAddCard: (columnId: string) => void
   onDeleteColumn?: (columnId: string) => void
   onEditCard: (card: TeamKanbanCard) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
+  onViewExecution?: (card: TeamKanbanCard) => void
   onToggleChecklistItem?: (cardId: string, itemId: string) => void
   onQuickMoveColumn?: (cardId: string, targetColId: string) => void
   onUpdateColumnWipLimit?: (columnId: string, wipLimit?: number) => void
@@ -31,10 +34,12 @@ export function TeamKanbanColumnView({
   cards,
   columns,
   canDelete = false,
+  cardExecutions,
   onAddCard,
   onDeleteColumn,
   onEditCard,
   onDispatchAgent,
+  onViewExecution,
   onToggleChecklistItem,
   onQuickMoveColumn,
   onUpdateColumnWipLimit
@@ -213,6 +218,8 @@ export function TeamKanbanColumnView({
               key={card.id}
               card={card}
               columns={columns}
+              executionStatus={cardExecutions?.[card.id]}
+              onViewExecution={onViewExecution}
               onEdit={onEditCard}
               onDispatchAgent={onDispatchAgent}
               onToggleChecklistItem={onToggleChecklistItem}

@@ -57,6 +57,17 @@ export class TeamExecutionService {
     return this.mapExecutionRow(row)
   }
 
+  getLatestExecutionForTask(taskId: string): AgentExecutionRecord | null {
+    const query = this.db.prepare(
+      `SELECT * FROM agent_executions WHERE task_id = ? ORDER BY created_at DESC LIMIT 1`
+    )
+    const row = query.get(taskId) as Record<string, unknown> | undefined
+    if (!row) {
+      return null
+    }
+    return this.mapExecutionRow(row)
+  }
+
   updateAgentExecutionStatus(options: {
     executionId: string
     status: AgentExecutionStatus
