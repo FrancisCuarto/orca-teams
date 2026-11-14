@@ -51,7 +51,17 @@
 
 ---
 
-## 5. Registro de Pruebas y Validación Continua
+## 5. Issues y Asignación de Tareas — Fase 4 (Whiteboard Colaborativo en Tiempo Real)
+
+| Issue   | Título                                                                                                                  | Agente / Rol Asignado                  | Rama Asociada                 | PR        |    Estado    |
+| ------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------- | --------- | :----------: |
+| **#24** | [[Fase 4] Motor CRDT y Modelo de Sincronización para Whiteboard](https://github.com/FrancisCuarto/orca-teams/issues/24) | Realtime & CRDT Engineer (Antigravity) | `feat/teams-fase4-whiteboard` | Pendiente | **En Curso** |
+| **#25** | [[Fase 4] Hook Reactivo useTeamWhiteboardSync y Presencia](https://github.com/FrancisCuarto/orca-teams/issues/25)       | Frontend Realtime Engineer             | `feat/teams-fase4-wb-hook`    | Pendiente |  Pendiente   |
+| **#26** | [[Fase 4] Renderizado de Cursores en Vivo e Integración](https://github.com/FrancisCuarto/orca-teams/issues/26)         | UI & Collaboration Engineer            | `feat/teams-fase4-wb-ui`      | Pendiente |  Pendiente   |
+
+---
+
+## 6. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
