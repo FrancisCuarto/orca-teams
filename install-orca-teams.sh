@@ -38,6 +38,15 @@ echo "🎨 2. Instalando iconos de Orca Teams..."
 mkdir -p "$ICONS_DIR" "$PIXMAPS_DIR"
 cp "$SCRIPT_DIR/resources/build/icon.png" "$ICONS_DIR/orca-teams.png"
 cp "$SCRIPT_DIR/resources/build/icon.png" "$PIXMAPS_DIR/orca-teams.png"
+for s in 16 24 32 48 64 128 256; do
+    s_dir="$HOME/.local/share/icons/hicolor/${s}x${s}/apps"
+    mkdir -p "$s_dir"
+    if [ -f "$HOME/.local/share/icons/hicolor/${s}x${s}/apps/orca-teams.png" ]; then
+        true
+    else
+        cp "$SCRIPT_DIR/resources/icon.png" "$s_dir/orca-teams.png" 2>/dev/null || true
+    fi
+done
 
 echo "🔗 3. Creando lanzador en línea de comandos ($BIN_DIR/orca-teams)..."
 mkdir -p "$BIN_DIR"
