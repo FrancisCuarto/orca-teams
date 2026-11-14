@@ -41,7 +41,17 @@
 
 ---
 
-## 4. Registro de Pruebas y Validación Continua
+## 4. Issues y Asignación de Tareas — Fase 3 (Asignación y Ejecución de Agentes)
+
+| Issue   | Título                                                                                                            | Agente / Rol Asignado                | Rama Asociada                | PR        |    Estado    |
+| ------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------- | --------- | :----------: |
+| **#17** | [[Fase 3] Servicio de Despacho y Ciclo de Vida de Agentes](https://github.com/FrancisCuarto/orca-teams/issues/17) | Agent Runtime Engineer (Antigravity) | `feat/teams-fase3-dispatch`  | Pendiente | **En Curso** |
+| **#18** | [[Fase 3] Monitoreo de Ejecución y Streaming de Logs](https://github.com/FrancisCuarto/orca-teams/issues/18)      | Frontend & Terminal Engineer         | `feat/teams-fase3-exec-ui`   | Pendiente |  Pendiente   |
+| **#19** | [[Fase 3] Integración del Despacho en Tarjetas Kanban](https://github.com/FrancisCuarto/orca-teams/issues/19)     | Collaboration & UI Engineer          | `feat/teams-fase3-card-drag` | Pendiente |  Pendiente   |
+
+---
+
+## 5. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
