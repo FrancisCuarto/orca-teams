@@ -55,3 +55,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
   - Componente `TeamKanbanCardAgentBadge` con indicador de estado animado (`running` con pulso), badge distinguido para agentes y acción rápida de ejecución.
   - Integración en `TeamKanbanCardItem` y `TeamKanbanColumnView` con propagación de eventos `onViewExecution` y `onDispatchAgent`.
   - Suite de 5 pruebas unitarias en `src/renderer/src/components/team/kanban/team-kanban-agent-integration.test.tsx` (68/68 tests unitarios pasando).
+- **Fase 4 — Motor CRDT y Modelo de Sincronización para Whiteboard (Issue #24 / PR #27)**:
+  - Motor colaborativo `TeamWhiteboardCRDT` basado en Yjs con operaciones atómicas (`upsertItem`, `moveItem`, `updateItemContent`, `deleteItem`, `setViewport`).
+  - Observador atómico por transacción (`afterTransaction`) e interfaces `ITeamWhiteboardCRDT` y `WhiteboardCursorPresence`.
+  - Suite de 7 pruebas unitarias en `src/shared/teamwork/realtime/team-crdt-whiteboard.test.ts`.
+- **Fase 4 — Hook Reactivo useTeamWhiteboardSync y Presencia de Cursores Remotos (Issue #25 / PR #28)**:
+  - Hook reactivo `useTeamWhiteboardSync` conectando el canvas visual con `TeamRoomProvider` y `TeamWhiteboardCRDT`.
+  - Transmisión en tiempo real de posición del cursor del usuario con throttling inteligente (50ms) y seguimiento de cursores remotos.
+  - Suite de 5 pruebas unitarias en `src/renderer/src/components/team/hooks/use-team-whiteboard-sync.test.ts`.
+- **Fase 4 — Renderizado de Cursores en Vivo e Integración del Whiteboard Colaborativo (Issue #26 / PR #29)**:
+  - Componente de renderizado de cursor en tiempo real `TeamWhiteboardCursor` con puntero SVG reactivo y píldora con nombre de colaborador.
+  - Modularización arquitectónica del Whiteboard (<300 líneas por archivo: `TeamWhiteboardToolbar`, `TeamWhiteboardCardItem`, `TeamWhiteboardView`, `TeamWhiteboardConnectedView`).
+  - Integración en `TeamPage.tsx` con soporte multiusuario en tiempo real.
+  - Suite de 2 pruebas unitarias en `src/renderer/src/components/team/whiteboard/TeamWhiteboardCursor.test.tsx` (82/82 tests unitarios pasando).
