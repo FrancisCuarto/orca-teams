@@ -22,12 +22,12 @@
 
 ## 2. Issues y Asignación de Tareas — Fase 1
 
-| Issue  | Título                                                                                                         | Agente / Rol Asignado                   | Rama Asociada                    | PR        |            Estado            |
-| ------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------- | --------- | :--------------------------: |
-| **#1** | [[Fase 1] Modelos de datos y contratos compartidos](https://github.com/FrancisCuarto/orca-teams/issues/1)      | Backend / Shared Engineer (Antigravity) | `feat/teams-fase1-models`        | Pendiente |         **En Curso**         |
-| **#2** | [[Fase 1] Esquema de Base de Datos y Persistencia](https://github.com/FrancisCuarto/orca-teams/issues/2)       | Database & Auth Engineer                | `feat/teams-fase1-db-auth`       | Pendiente | Pendiente (bloqueado por #1) |
-| **#3** | [[Fase 1] UI: Selector y Gestión de Equipos y Proyectos](https://github.com/FrancisCuarto/orca-teams/issues/3) | Frontend Engineer                       | `feat/teams-fase1-ui-workspaces` | Pendiente | Pendiente (bloqueado por #1) |
-| **#4** | [[Fase 1] Flujo de Invitaciones y Enlaces Seguros](https://github.com/FrancisCuarto/orca-teams/issues/4)       | Security & API Engineer                 | `feat/teams-fase1-invitations`   | Pendiente | Pendiente (bloqueado por #2) |
+| Issue  | Título                                                                                                         | Agente / Rol Asignado                   | Rama Asociada                    | PR                                                       |     Estado     |
+| ------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------- | -------------------------------------------------------- | :------------: |
+| **#1** | [[Fase 1] Modelos de datos y contratos compartidos](https://github.com/FrancisCuarto/orca-teams/issues/1)      | Backend / Shared Engineer (Antigravity) | `feat/teams-fase1-models`        | [#5](https://github.com/FrancisCuarto/orca-teams/pull/5) | **Completado** |
+| **#2** | [[Fase 1] Esquema de Base de Datos y Persistencia](https://github.com/FrancisCuarto/orca-teams/issues/2)       | Database & Auth Engineer                | `feat/teams-fase1-db-auth`       | [#6](https://github.com/FrancisCuarto/orca-teams/pull/6) | **Completado** |
+| **#3** | [[Fase 1] UI: Selector y Gestión de Equipos y Proyectos](https://github.com/FrancisCuarto/orca-teams/issues/3) | Frontend Engineer                       | `feat/teams-fase1-ui-workspaces` | Pendiente                                                |  **En Curso**  |
+| **#4** | [[Fase 1] Flujo de Invitaciones y Enlaces Seguros](https://github.com/FrancisCuarto/orca-teams/issues/4)       | Security & API Engineer                 | `feat/teams-fase1-invitations`   | Pendiente                                                |   Pendiente    |
 
 ---
 
