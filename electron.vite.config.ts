@@ -37,6 +37,8 @@ const BUNDLED_MAIN_DEPENDENCIES = new Set([
   'remark-parse',
   'remark-gfm',
   'hast-util-from-html-isomorphic',
+  'sucrase',
+  'es-module-lexer',
   // Windows NSIS copies app.asar before external resources; bootstrap must not race resources/node_modules.
   'zod'
 ])

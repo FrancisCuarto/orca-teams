@@ -37,6 +37,14 @@ describe('Antigravity Linux keyring access', () => {
     expect(runProcess).toHaveBeenCalledTimes(2)
   })
 
+  it('treats a missing keyring item as absent even when secret-tool reports diagnostics', async () => {
+    vi.mocked(runProcess)
+      .mockResolvedValueOnce(collections)
+      .mockResolvedValueOnce(unlocked)
+      .mockResolvedValueOnce({ ...ok(), code: 1, stderr: 'No matching items found\n' })
+    await expect(readAntigravityLinuxCredential()).resolves.toBeNull()
+  })
+
   it('replaces agy’s go-keyring item in its collection and verifies the readback', async () => {
     vi.mocked(runProcess)
       .mockResolvedValueOnce(collections)

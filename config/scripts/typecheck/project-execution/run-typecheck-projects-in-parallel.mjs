@@ -8,7 +8,11 @@ import {
   readPinnedBunVersion,
   resolvePinnedBunExecutable
 } from '../../tool-invocation/pinned-bun-executable.mjs'
-import { resolveTsrsTypecheckCommand, supportsTsrs } from './tsrs-typecheck-compiler.mjs'
+import {
+  resolveTsrsLauncher,
+  resolveTsrsTypecheckCommand,
+  supportsTsrs
+} from './tsrs-typecheck-compiler.mjs'
 
 const BYTES_PER_GIB = 1024 ** 3
 
@@ -156,7 +160,12 @@ export function selectTypecheckCompiler(
   }
 ) {
   if (compiler === 'auto') {
-    compiler = supportsTsrs(platform, arch) ? 'tsrs' : 'bun'
+    try {
+      resolveTsrsLauncher(root)
+      compiler = supportsTsrs(platform, arch) ? 'tsrs' : 'native'
+    } catch {
+      compiler = 'native'
+    }
   }
   if (compiler === 'tsrs' && !supportsTsrs(platform, arch)) {
     throw new Error(`tsrs is unavailable on ${platform}/${arch}; use --compiler=bun.`)
@@ -190,8 +199,8 @@ export function typecheckBatches(projects, { compiler, bunConcurrency, memoryByt
   )
 }
 
-// Uncapped tsrs runs ~40 threads on 24 cores; 8 checkers matched its wall time with 16% less CPU under load.
-export const TSRS_DEFAULT_CHECKERS = 8
+// Uncapped tsrs runs ~40 threads on 24 cores; keep checkers capped at 2 on 16GB hosts.
+export const TSRS_DEFAULT_CHECKERS = 2
 
 const checkerArgs = (checkers) => (checkers ? ['--checkers', String(checkers)] : [])
 
