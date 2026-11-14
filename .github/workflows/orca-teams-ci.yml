@@ -51,4 +51,4 @@ jobs:
 
       - name: Run Teams Unit Tests
         run: |
-          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts src/shared/teamwork/team-workspace-types.test.ts src/shared/teamwork/team-database-service.test.ts src/shared/teamwork/team-invitation-service.test.ts src/shared/teamwork/realtime/team-crdt-board.test.ts src/renderer/src/components/team/hooks/use-team-kanban-sync.test.ts
+          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts src/shared/teamwork/team-workspace-types.test.ts src/shared/teamwork/team-database-service.test.ts src/shared/teamwork/team-invitation-service.test.ts src/shared/teamwork/realtime/team-crdt-board.test.ts src/renderer/src/components/team/hooks/use-team-kanban-sync.test.ts src/shared/teamwork/realtime/team-crdt-concurrency.test.ts
