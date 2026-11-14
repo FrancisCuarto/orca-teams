@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="resources/build/icon.png" alt="Orca Teams Logo" width="84" style="border-radius: 18px;" /><br/>
+  <img src="resources/build/icon.png" alt="Orca Teams Logo" width="96" /><br/>
   Orca Teams
 </h1>
 
