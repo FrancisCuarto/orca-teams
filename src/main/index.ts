@@ -132,6 +132,9 @@ const preflightReady =
 
 // Skip userData writes after losing the single-instance lock.
 if (preflightReady) {
+  if (process.platform === 'linux' && app.isPackaged && typeof app.setDesktopName === 'function') {
+    app.setDesktopName('orca-teams.desktop')
+  }
   enableLinearRegexpFallback()
   void leaseAppImageGenerationForCurrentProcess()
   // Before any gate check: saved WSL work keeps a closed gate serving it.
