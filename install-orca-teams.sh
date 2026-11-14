@@ -13,20 +13,40 @@ ICONS_DIR="$HOME/.local/share/icons/hicolor/512x512/apps"
 PIXMAPS_DIR="$HOME/.local/share/pixmaps"
 BIN_DIR="$HOME/.local/bin"
 
+REBUILD_REQUESTED=0
+if [ "${1:-}" = "--rebuild" ]; then
+    REBUILD_REQUESTED=1
+fi
+
 echo "=========================================="
 echo "   Instalando Orca Teams en tu sistema    "
 echo "=========================================="
 
-if [ ! -f "$SOURCE_APP_DIR/orca-ide" ]; then
-    echo "⚠️  No se encontró el ejecutable en $SOURCE_APP_DIR."
-    echo "Compilando versión desempaquetada primero..."
+NEEDS_BUILD=0
+if [ "$REBUILD_REQUESTED" = "1" ] || [ ! -f "$SOURCE_APP_DIR/orca-ide" ] || [ ! -f "$SOURCE_APP_DIR/resources/app.asar" ]; then
+    NEEDS_BUILD=1
+elif [ "$SCRIPT_DIR/resources/build/icon.png" -nt "$SOURCE_APP_DIR/resources/app.asar" ] || \
+     [ "$SCRIPT_DIR/resources/icon.png" -nt "$SOURCE_APP_DIR/resources/app.asar" ] || \
+     [ "$SCRIPT_DIR/package.json" -nt "$SOURCE_APP_DIR/resources/app.asar" ] || \
+     [ "$SCRIPT_DIR/src/main/index.ts" -nt "$SOURCE_APP_DIR/resources/app.asar" ]; then
+    NEEDS_BUILD=1
+fi
+
+if [ "$NEEDS_BUILD" = "1" ]; then
+    echo "🔨 Compilando última versión desempaquetada de Orca Teams..."
     (
       cd "$SCRIPT_DIR" &&
       pnpm run build:electron-vite &&
       pnpm run build:web-from-renderer &&
+      pnpm run build:mobile-web &&
       npx electron-builder --config config/electron-builder.config.cjs --dir
     )
 fi
+
+echo "🛑 0. Deteniendo instancias previas de Orca Teams (si existen)..."
+pkill -TERM -f "$TARGET_APP_DIR/orca-ide" 2>/dev/null || true
+pkill -TERM -f "$HOME/.config/orca-teams/" 2>/dev/null || true
+sleep 1
 
 echo "📦 1. Copiando aplicación a $TARGET_APP_DIR..."
 rm -rf "$TARGET_APP_DIR"
@@ -36,8 +56,12 @@ chmod +x "$TARGET_APP_DIR/orca-ide"
 
 echo "🎨 2. Instalando iconos de Orca Teams..."
 mkdir -p "$ICONS_DIR" "$PIXMAPS_DIR"
+cp -f "$SCRIPT_DIR/resources/build/icon.png" "$TARGET_APP_DIR/orca-teams-icon.png"
 cp -f "$SCRIPT_DIR/resources/build/icon.png" "$ICONS_DIR/orca-teams.png"
 cp -f "$SCRIPT_DIR/resources/build/icon.png" "$PIXMAPS_DIR/orca-teams.png"
+if [ ! -f "$HOME/.local/share/icons/hicolor/index.theme" ] && [ -f "/usr/share/icons/hicolor/index.theme" ]; then
+    cp -f "/usr/share/icons/hicolor/index.theme" "$HOME/.local/share/icons/hicolor/index.theme"
+fi
 if command -v python3 >/dev/null 2>&1 && python3 -c "import PIL" 2>/dev/null; then
     python3 - "$SCRIPT_DIR/resources/build/icon.png" << 'PYEOF'
 import os, sys
@@ -76,7 +100,7 @@ unset TERM_PROGRAM
 [ -n "$_teams_user_data" ] && export ORCA_TEAMS_USER_DATA_PATH="$_teams_user_data"
 export CHROME_DESKTOP="orca-teams.desktop"
 
-exec "$HOME/.local/share/orca-teams/orca-ide" "$@"
+exec "$HOME/.local/share/orca-teams/orca-ide" --class=orca-teams "$@"
 EOF
 chmod +x "$BIN_DIR/orca-teams"
 
@@ -88,7 +112,7 @@ Name=Orca Teams
 Comment=Next-gen IDE for parallel agentic development and team collaboration
 GenericName=Integrated Development Environment
 Exec=__EXEC_PATH__ %U
-Icon=orca-teams
+Icon=__ICON_PATH__
 Terminal=false
 Type=Application
 Categories=Development;IDE;
@@ -98,15 +122,23 @@ Keywords=orca;teams;ide;code;agent;
 EOF
 
 sed -i "s|__EXEC_PATH__|$BIN_DIR/orca-teams|g" "$DESKTOP_DIR/orca-teams.desktop"
+sed -i "s|__ICON_PATH__|$TARGET_APP_DIR/orca-teams-icon.png|g" "$DESKTOP_DIR/orca-teams.desktop"
 chmod +x "$DESKTOP_DIR/orca-teams.desktop"
 
-# Actualizar base de datos de escritorio si existe el comando
+# Actualizar base de datos de escritorio e iconos (GTK y KDE Plasma)
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 fi
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    gtk-update-icon-cache "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+fi
+
+rm -f "$HOME/.cache/icon-cache.kcache" 2>/dev/null || true
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+    kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
 fi
 
 echo ""
