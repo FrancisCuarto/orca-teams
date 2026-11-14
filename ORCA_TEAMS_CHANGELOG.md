@@ -42,3 +42,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 - **Fase 2 — Indicadores de Presencia en Vivo y Reconciliación (Issue #12 / PR #15)**:
   - Componente `TeamBoardPresenceBar` para visualización en tiempo real de colaboradores conectados, tarjetas activas y estado de sincronización cumpliendo el sistema de diseño de Orca.
   - Suite de 2 pruebas de concurrencia y particiones de red en `src/shared/teamwork/realtime/team-crdt-concurrency.test.ts` demostrando convergencia determinista entre 3 clientes aislados (52/52 tests unitarios pasando).
+- **Fase 3 — Servicio de Despacho y Ciclo de Vida de Agentes (Issue #17 / PR #20)**:
+  - Implementación de `TeamAgentDispatchService` con construcción inteligente de prompt a partir de tarjetas y columnas (`buildAgentExecutionPrompt`).
+  - Idempotencia nativa (`idempotencyKey`), ciclo de vida (`queued` -> `running` -> `completed` / `failed` / `cancelled`) y soporte de cancelación asíncrona.
+  - Streaming de logs de ejecución y persistencia de registros de agentes (`AgentExecutionRecord`).
+  - Suite de 7 pruebas unitarias en `src/shared/teamwork/team-agent-dispatch-service.test.ts`.
+- **Fase 3 — Monitoreo de Ejecución y Streaming de Logs (Issue #18 / PR #21)**:
+  - Componente modal `TeamAgentExecutionModal` con terminal de streaming en tiempo real respetando `scrollbar-sleek` y tokens de diseño.
+  - Indicadores visuales de estado (`Loader2` animado para ejecución, `CheckCircle2` para éxito, `AlertCircle` para errores) y botón de abortar tarea.
+  - Suite de 4 pruebas unitarias en `src/renderer/src/components/team/kanban/TeamAgentExecutionModal.test.tsx`.
+- **Fase 3 — Integración de Despacho e Insignias en Tarjetas Kanban (Issue #19 / PR #22)**:
+  - Componente `TeamKanbanCardAgentBadge` con indicador de estado animado (`running` con pulso), badge distinguido para agentes y acción rápida de ejecución.
+  - Integración en `TeamKanbanCardItem` y `TeamKanbanColumnView` con propagación de eventos `onViewExecution` y `onDispatchAgent`.
+  - Suite de 5 pruebas unitarias en `src/renderer/src/components/team/kanban/team-kanban-agent-integration.test.tsx` (68/68 tests unitarios pasando).
