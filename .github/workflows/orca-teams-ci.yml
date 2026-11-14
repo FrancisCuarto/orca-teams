@@ -47,4 +47,4 @@ jobs:
 
       - name: Run Teams Unit Tests
         run: |
-          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts
+          pnpm run test src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts src/shared/teamwork/team-workspace-types.test.ts
