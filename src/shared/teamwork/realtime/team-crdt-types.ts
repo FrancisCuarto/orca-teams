@@ -2,6 +2,10 @@ import type {
   TeamKanbanBoard,
   TeamKanbanCard,
   TeamKanbanColumn,
+  TeamNote,
+  TeamNoteCategory,
+  TeamNoteStatus,
+  TeamNotesCollection,
   TeamWhiteboard,
   TeamWhiteboardItem
 } from '../team-kanban-types'
@@ -12,6 +16,7 @@ export type CollaboratorPresence = {
   avatarUrl?: string
   color: string
   activeCardId?: string
+  activeNoteId?: string
   cursor?: { x: number; y: number }
   lastSeen: number
 }
@@ -60,6 +65,19 @@ export type ITeamWhiteboardCRDT = {
   updateItemContent(itemId: string, content: string): void
   deleteItem(itemId: string): void
   setViewport(viewport: { x: number; y: number; zoom: number }): void
+  encodeStateAsUpdate(): Uint8Array
+  applyUpdate(update: Uint8Array, origin?: unknown): void
+  destroy(): void
+}
+
+export type ITeamNotesCRDT = {
+  readonly docId: string
+  getNotesCollection(): TeamNotesCollection
+  initializeFromCollection(collection: TeamNotesCollection): void
+  upsertNote(note: TeamNote): void
+  deleteNote(noteId: string): void
+  updateNoteStatus(noteId: string, status?: TeamNoteStatus): void
+  updateNoteCategory(noteId: string, category: TeamNoteCategory): void
   encodeStateAsUpdate(): Uint8Array
   applyUpdate(update: Uint8Array, origin?: unknown): void
   destroy(): void

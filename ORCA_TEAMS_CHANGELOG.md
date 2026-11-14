@@ -68,3 +68,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
   - Modularización arquitectónica del Whiteboard (<300 líneas por archivo: `TeamWhiteboardToolbar`, `TeamWhiteboardCardItem`, `TeamWhiteboardView`, `TeamWhiteboardConnectedView`).
   - Integración en `TeamPage.tsx` con soporte multiusuario en tiempo real.
   - Suite de 2 pruebas unitarias en `src/renderer/src/components/team/whiteboard/TeamWhiteboardCursor.test.tsx` (82/82 tests unitarios pasando).
+- **Fase 5 — Motor CRDT para Notas y Documentación Colaborativa (Issue #31 / PR #34)**:
+  - Motor colaborativo `TeamNotesCRDT` basado en Yjs para notas enriquecidas, ADRs, RFCs y actas de reunión.
+  - Soporte de transacciones atómicas (`createNote`, `updateNote`, `deleteNote`, `extractTaskToKanban`) con notificación a observadores vía `doc.on('update')`.
+  - Suite de 7 pruebas unitarias en `src/shared/teamwork/realtime/team-crdt-notes.test.ts`.
+- **Fase 5 — Hook Reactivo useTeamNotesSync y Tiempo Real (Issue #32 / PR #35)**:
+  - Hook reactivo `useTeamNotesSync` con integración bidireccional entre Yjs CRDT y React State.
+  - Heartbeat y presencia de colaboradores en notas activas con limpieza al desmontar.
+  - Extracción directa de tareas de notas Markdown hacia el tablero Kanban.
+  - Suite de 5 pruebas unitarias en `src/renderer/src/components/team/hooks/use-team-notes-sync.test.ts`.
+- **Fase 5 — Editor Colaborativo, Sidebar y Extracción a Kanban (Issue #33 / PR #36)**:
+  - Modularización arquitectónica con `TeamNotesSidebar` (<140 líneas) y `TeamNoteEditor` (<205 líneas) respetando el sistema de diseño Orca.
+  - Soporte de IME composition safety en inputs y tags mediante `isImeOwnedKeyboardEvent`.
+  - Componente conectado `TeamNotesConnectedView` integrado en `TeamPage.tsx`.
+  - Suite de 4 pruebas unitarias en `src/renderer/src/components/team/notes/TeamNotesView.test.tsx` (98/98 tests unitarios pasando).
