@@ -18,3 +18,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
   - Función de jerarquía y autorización `hasTeamPermission` (`owner > admin > member > viewer`).
   - Suite de 13 pruebas unitarias completas pasando con éxito en `src/shared/teamwork/team-workspace-types.test.ts`.
   - Workflow de integración continua dedicado `orca-teams-ci.yml`.
+- **Fase 1 — Persistencia Relacional y Autorización (Issue #2)**:
+  - Definición del esquema DDL dual dialect (PostgreSQL / SQLite) en `src/shared/teamwork/team-schema.ts`.
+  - Implementación de `TeamDatabaseService` con reglas estrictas de autorización, membresía, aislamiento de proyectos privados e idempotencia en despacho de agentes.
+  - Suite de 9 pruebas unitarias de persistencia y aislamiento pasando al 100% en `src/shared/teamwork/team-database-service.test.ts`.
