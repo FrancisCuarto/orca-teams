@@ -29,6 +29,7 @@ function createTestBoard(): TeamKanbanBoard {
         updatedAt: 1000
       }
     },
+    createdAt: 1000,
     updatedAt: 1000
   }
 }

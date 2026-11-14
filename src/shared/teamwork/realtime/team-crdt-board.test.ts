@@ -30,6 +30,7 @@ function createSampleBoard(): TeamKanbanBoard {
         updatedAt: now
       }
     },
+    createdAt: now,
     updatedAt: now
   }
 }
