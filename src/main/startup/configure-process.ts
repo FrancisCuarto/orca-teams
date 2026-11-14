@@ -204,6 +204,12 @@ export function configureDevUserDataPath(isDev: boolean): void {
   }
 
   if (!isDev) {
+    const explicitTeamsPath = process.env.ORCA_TEAMS_USER_DATA_PATH?.trim()
+    const inheritedPath = process.env.ORCA_USER_DATA_PATH?.trim().replace(/[\\/]+$/, '')
+    const overrideUserDataPath =
+      explicitTeamsPath ||
+      (inheritedPath && inheritedPath.endsWith('orca-teams') ? inheritedPath : undefined)
+    app.setPath('userData', overrideUserDataPath || join(app.getPath('appData'), 'orca-teams'))
     return
   }
   const overrideUserDataPath = process.env.ORCA_DEV_USER_DATA_PATH

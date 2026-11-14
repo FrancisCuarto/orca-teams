@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { AppIdentity } from '../../shared/app-identity'
 
-const BASE_APP_NAME = 'Orca'
-const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
+const BASE_APP_NAME = 'Orca Teams'
+const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca-teams'
 const MAX_LABEL_LENGTH = 80
 
 export type DevInstanceIdentity = AppIdentity & {
@@ -13,8 +13,8 @@ export type DevInstanceIdentity = AppIdentity & {
 }
 
 /** Electron fixes the Keychain service before ready. Rename dev only; packaged forks must retain their CFBundleName-derived encryption keys. */
-export function shouldApplyPreReadyAppName(identity: Pick<AppIdentity, 'isDev'>): boolean {
-  return identity.isDev
+export function shouldApplyPreReadyAppName(_identity: Pick<AppIdentity, 'isDev'>): boolean {
+  return true
 }
 
 function cleanEnvValue(value: string | undefined): string | null {

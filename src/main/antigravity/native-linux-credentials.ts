@@ -102,8 +102,12 @@ async function lookup(): Promise<AntigravityNativeCredential | null> {
     if (result.code === 0 && result.stdout) {
       return parseAntigravityNativeCredential(decodeAntigravityKeychainValue(result.stdout))
     }
-    // secret-tool exits 1 silently when no item matches.
-    if (result.code === 1 && !result.stdout && !result.stderr.trim()) {
+    // secret-tool exits 1 when no item matches; some builds emit diagnostics on stderr.
+    if (result.code === 1 && !result.stdout) {
+      return null
+    }
+    // A successful lookup with no payload means no stored credential.
+    if (result.code === 0 && !result.stdout) {
       return null
     }
   }

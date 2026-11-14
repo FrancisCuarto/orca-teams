@@ -80,6 +80,7 @@ prod-release-scan-*.md
 
 tmp/
 .tmp/
+.orca/
 design-docs/
 .context/
 .atl/
