@@ -82,3 +82,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
   - Soporte de IME composition safety en inputs y tags mediante `isImeOwnedKeyboardEvent`.
   - Componente conectado `TeamNotesConnectedView` integrado en `TeamPage.tsx`.
   - Suite de 4 pruebas unitarias en `src/renderer/src/components/team/notes/TeamNotesView.test.tsx` (98/98 tests unitarios pasando).
+- **Fase 6 — Integración Global, Typecheck y Empaquetado Desktop (Issue #38 / PR #39)**:
+  - Verificación integral de tipado TypeScript (`typecheck:web`, `typecheck:node`, `typecheck:cli`, `typecheck`) al 100% en verde.
+  - Resolución de tipos de snapshot (`createdAt`), tipados nulos en diálogos de invitación y ejecución de agentes, y mapeo de tokens visuales de categoría en sidebar de notas.
+  - Verificación de la navegación global desde la barra lateral (`SidebarNav`) y App Workspace Shell hacia `TeamPage`.
+  - Suite completa de 16 archivos de pruebas unitarias (**98/98 tests**) pasando con 0 errores y 0 advertencias.

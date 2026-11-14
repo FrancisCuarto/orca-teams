@@ -107,7 +107,7 @@ export function TeamNotesSidebar({
               >
                 <div className="flex items-center justify-between gap-1 mb-1">
                   <span
-                    className={`text-3xs uppercase font-semibold px-1.5 py-0.2 rounded ${catMeta.colorClass}`}
+                    className={`text-3xs uppercase font-semibold px-1.5 py-0.2 rounded border ${catMeta.className} ${catMeta.bg}`}
                   >
                     {catMeta.label}
                   </span>
