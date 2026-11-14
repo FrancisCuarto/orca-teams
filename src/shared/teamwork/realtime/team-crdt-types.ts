@@ -12,6 +12,7 @@ export type CollaboratorPresence = {
   avatarUrl?: string
   color: string
   activeCardId?: string
+  cursor?: { x: number; y: number }
   lastSeen: number
 }
 
