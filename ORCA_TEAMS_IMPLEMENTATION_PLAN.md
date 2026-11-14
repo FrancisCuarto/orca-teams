@@ -16,7 +16,7 @@
 | **Fase 3** | Asignación y ejecución de agentes                         | **Completada** | Asignar tarjeta a un agente ejecuta tarea automáticamente con streaming de logs y feedback.               |
 | **Fase 4** | Whiteboard colaborativo                                   | **Completada** | Lienzo colaborativo en tiempo real con persistencia multiusuario.                                         |
 | **Fase 5** | Notes y documentación vinculada                           | **Completada** | Notas sincronizadas con guardado automático y vinculación a tarjetas Kanban.                              |
-| **Fase 6** | Integración global y empaquetado                          |   Pendiente    | Build instalable de escritorio (`orca-teams`) con suite de pruebas completa en verde.                     |
+| **Fase 6** | Integración global y empaquetado                          | **Completada** | Build instalable de escritorio (`orca-teams`) con suite de pruebas completa en verde.                     |
 
 ---
 
@@ -71,7 +71,15 @@
 
 ---
 
-## 7. Registro de Pruebas y Validación Continua
+## 7. Issues y Asignación de Tareas — Fase 6 (Integración Global, Typecheck y Empaquetado Desktop)
+
+| Issue   | Título                                                                                                                | Agente / Rol Asignado                      | Rama Asociada                  | PR                                                         |     Estado     |
+| ------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------ | ---------------------------------------------------------- | :------------: |
+| **#38** | [[Fase 6] Integración Global, Typecheck y Empaquetado Desktop](https://github.com/FrancisCuarto/orca-teams/issues/38) | Tech Lead & Release Engineer (Antigravity) | `feat/teams-fase6-integration` | [#39](https://github.com/FrancisCuarto/orca-teams/pull/39) | **Completado** |
+
+---
+
+## 8. Registro de Pruebas y Validación Continua
 
 - `src/renderer/src/components/team/kanban/team-kanban-board-mutations.test.ts`: **14/14 tests pasando**.
 - `src/shared/teamwork/team-workspace-types.test.ts`: **13/13 tests pasando**.
