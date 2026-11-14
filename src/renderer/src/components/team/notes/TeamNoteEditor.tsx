@@ -1,5 +1,5 @@
 import React from 'react'
-import { KanbanSquare, Tag, Trash2, Zap } from 'lucide-react'
+import { Copy, KanbanSquare, Tag, Trash2, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-keyboard-event'
@@ -22,6 +22,7 @@ type Props = {
   onAddTag: () => void
   onRemoveTag: (tag: string) => void
   onToggleChecklistLine: (index: number) => void
+  onCopyMarkdown: () => void
   onSendToAgentContext: () => void
   onExtractTasksToKanban?: () => void
 }
@@ -38,6 +39,7 @@ export function TeamNoteEditor({
   onAddTag,
   onRemoveTag,
   onToggleChecklistLine,
+  onCopyMarkdown,
   onSendToAgentContext,
   onExtractTasksToKanban
 }: Props): React.JSX.Element {
@@ -119,6 +121,17 @@ export function TeamNoteEditor({
               Extraer al Kanban
             </Button>
           )}
+
+          {/* Copy Markdown Button */}
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={onCopyMarkdown}
+            title="Copiar nota en formato Markdown"
+          >
+            <Copy className="size-3 text-git-graph-lane-2 mr-1" />
+            Copiar MD
+          </Button>
 
           {/* Send to Agent Context Button */}
           <Button

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
-import type { Project, Team, TeamRole } from '../../../../shared/teamwork/team-workspace-types'
+import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
 import {
   computeBoardSprintMetrics,
   extractActionItemsFromMarkdownToBoard
@@ -15,66 +15,21 @@ import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
 import { useTeamWorkspaceData } from './hooks/use-team-workspace-data'
-
-const INITIAL_STATIC_EPOCH = 1700000000
+import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
 
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
-
   const activeWorktree = useActiveWorktree()
   const activeRepo = useActiveRepo()
+  const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
 
-  const defaultTeam: Team = useMemo(
-    () => ({
-      id: 'team-orca-core',
-      name: 'Orca Core Team',
-      slug: 'orca-core',
-      ownerId: 'usr-francis',
-      description: 'Equipo central de desarrollo',
-      createdAt: INITIAL_STATIC_EPOCH,
-      updatedAt: INITIAL_STATIC_EPOCH
-    }),
-    []
-  )
-
-  const defaultProject: Project = useMemo(() => {
-    const path = activeWorktree?.path ?? activeRepo?.path ?? null
-    const segments = path ? path.split(/[/\\]/).filter(Boolean) : []
-    const name = activeRepo?.displayName ?? segments.at(-1) ?? 'Main Workspace'
-    const id = activeRepo?.id ?? activeWorktree?.id ?? 'proj-default'
-    return {
-      id,
-      teamId: defaultTeam.id,
-      name,
-      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      visibility: 'team',
-      createdAt: INITIAL_STATIC_EPOCH,
-      updatedAt: INITIAL_STATIC_EPOCH
-    }
-  }, [
-    activeWorktree?.path,
-    activeWorktree?.id,
-    activeRepo?.path,
-    activeRepo?.id,
-    activeRepo?.displayName,
-    defaultTeam.id
-  ])
-
-  const [teams, setTeams] = useState<Team[]>([defaultTeam])
-  const [activeTeamId, setActiveTeamId] = useState<string>(defaultTeam.id)
-  const [projects, setProjects] = useState<Project[]>([defaultProject])
-  const [activeProjectId, setActiveProjectId] = useState<string>(defaultProject.id)
-  const [userRole] = useState<TeamRole>('owner')
-
-  const activeTeam = useMemo(
-    () => teams.find((t) => t.id === activeTeamId) ?? teams[0] ?? null,
-    [teams, activeTeamId]
-  )
-
-  const currentProject = useMemo(
-    () => projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null,
-    [projects, activeProjectId]
-  )
+  const registry = useTeamWorkspaceRegistry({
+    activeWorktreeId: activeWorktree?.id,
+    activeWorktreePath: activeWorktree?.path,
+    activeRepoId: activeRepo?.id,
+    activeRepoPath: activeRepo?.path,
+    activeRepoDisplayName: activeRepo?.displayName
+  })
 
   const {
     board,
@@ -86,36 +41,26 @@ export default function TeamPage(): React.JSX.Element {
     handleWhiteboardChange,
     handleNotesChange
   } = useTeamWorkspaceData({
-    projectId: currentProject?.id ?? 'proj-default',
-    projectPath: activeWorktree?.path ?? activeRepo?.path ?? null,
+    projectId: registry.currentProject?.id ?? 'proj-default',
+    projectPath,
     connectionId: activeRepo?.connectionId ?? undefined
   })
 
   const boardMetrics = useMemo(() => (board ? computeBoardSprintMetrics(board) : null), [board])
 
-  const handleCreateTeam = useCallback((newTeam: Omit<Team, 'createdAt' | 'updatedAt'>) => {
-    const now = Date.now()
-    const fullTeam: Team = { ...newTeam, createdAt: now, updatedAt: now }
-    setTeams((prev) => [...prev, fullTeam])
-    setActiveTeamId(fullTeam.id)
-    toast.success(`Equipo '${fullTeam.name}' creado con éxito`)
-  }, [])
-
-  const handleCreateProject = useCallback((newProj: Omit<Project, 'createdAt' | 'updatedAt'>) => {
-    const now = Date.now()
-    const fullProj: Project = { ...newProj, createdAt: now, updatedAt: now }
-    setProjects((prev) => [...prev, fullProj])
-    setActiveProjectId(fullProj.id)
-    toast.success(`Proyecto '${fullProj.name}' creado con éxito`)
-  }, [])
-
   const handleInviteMember = useCallback(
-    async (email: string, role: TeamRole): Promise<string> => {
-      const token = `inv-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-      toast.success(`Invitación enviada a ${email} como ${role.toUpperCase()}`)
-      return `https://orca.run/join?team=${activeTeam?.slug ?? 'orca'}&token=${token}`
+    async (email: string, role: TeamRole) => {
+      const result = await registry.handleSendInvitation(email, role)
+      if (result.emailSent) {
+        toast.success(`Invitación enviada por correo a ${email} vía ${result.transportUsed}`)
+      } else {
+        toast.warning(
+          `Invitación guardada para ${email}, pero no se pudo enviar por email: ${result.error ?? 'Configura SMTP o Resend'}`
+        )
+      }
+      return result
     },
-    [activeTeam?.slug]
+    [registry]
   )
 
   const handleExtractTasksToKanban = useCallback(
@@ -144,21 +89,27 @@ export default function TeamPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-background">
-      {/* Top Workspace Selector Bar */}
       <TeamProjectSelector
-        teams={teams}
-        activeTeam={activeTeam}
-        projects={projects}
-        activeProject={currentProject}
-        userRole={userRole}
-        onSelectTeam={setActiveTeamId}
-        onSelectProject={setActiveProjectId}
-        onCreateTeam={handleCreateTeam}
-        onCreateProject={handleCreateProject}
+        teams={registry.teams}
+        activeTeam={registry.activeTeam}
+        projects={registry.projects}
+        activeProject={registry.currentProject}
+        members={registry.activeMembers}
+        pendingInvitations={registry.activePendingInvitations}
+        mailConfig={registry.mailConfig}
+        userRole={registry.userRole}
+        onSelectTeam={registry.setActiveTeamId}
+        onSelectProject={registry.setActiveProjectId}
+        onCreateTeam={registry.handleCreateTeam}
+        onCreateProject={registry.handleCreateProject}
         onInviteMember={handleInviteMember}
+        onResendInvitation={registry.handleResendInvitation}
+        onRevokeInvitation={registry.handleRevokeInvitation}
+        onAcceptInvitation={registry.handleAcceptInvitation}
+        onSaveMailConfig={registry.handleSaveMailConfig}
+        onTestMailConfig={registry.handleTestMailConfig}
       />
 
-      {/* Sub-tab Switcher & Status Header */}
       <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 border-b border-border bg-card/30">
         <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border">
           <Button
@@ -169,7 +120,6 @@ export default function TeamPage(): React.JSX.Element {
             <Kanban className="w-3.5 h-3.5" />
             Tablero Kanban
           </Button>
-
           <Button
             size="xs"
             variant={activeTab === 'whiteboard' ? 'secondary' : 'ghost'}
@@ -178,7 +128,6 @@ export default function TeamPage(): React.JSX.Element {
             <PenTool className="w-3.5 h-3.5" />
             Pizarra Visual
           </Button>
-
           <Button
             size="xs"
             variant={activeTab === 'notes' ? 'secondary' : 'ghost'}
@@ -196,7 +145,6 @@ export default function TeamPage(): React.JSX.Element {
               {notes?.notes.length ?? 0} docs
             </span>
           )}
-
           <Button
             variant="ghost"
             size="icon-xs"
@@ -209,7 +157,6 @@ export default function TeamPage(): React.JSX.Element {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="flex flex-1 min-h-0 overflow-hidden">
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
@@ -217,31 +164,35 @@ export default function TeamPage(): React.JSX.Element {
           </div>
         ) : activeTab === 'kanban' && board ? (
           <TeamKanbanBoardView
-            key={currentProject?.id}
+            key={registry.currentProject?.id}
             board={board}
+            projectId={registry.currentProject?.id ?? 'proj-default'}
+            projectPath={projectPath}
+            currentUserId={registry.currentUserId}
+            humanMembers={registry.humanMembers}
             onChange={handleBoardChange}
           />
         ) : activeTab === 'whiteboard' && whiteboard ? (
           <TeamWhiteboardConnectedView
-            key={currentProject?.id}
-            whiteboardId={currentProject?.id ?? 'wb-default'}
-            projectId={currentProject?.id ?? 'proj-default'}
+            key={registry.currentProject?.id}
+            whiteboardId={registry.currentProject?.id ?? 'wb-default'}
+            projectId={registry.currentProject?.id ?? 'proj-default'}
             initialWhiteboard={whiteboard}
             currentUser={{
-              userId: 'usr-francis',
-              displayName: 'Francis (Lead)',
+              userId: registry.currentUserId,
+              displayName: registry.activeMembers[0]?.displayName ?? 'Francis (Lead)',
               color: '#10b981'
             }}
             onPersist={handleWhiteboardChange}
           />
         ) : activeTab === 'notes' && notes ? (
           <TeamNotesConnectedView
-            key={currentProject?.id}
-            projectId={currentProject?.id ?? 'proj-default'}
+            key={registry.currentProject?.id}
+            projectId={registry.currentProject?.id ?? 'proj-default'}
             initialNotes={notes}
             currentUser={{
-              userId: 'usr-francis',
-              displayName: 'Francis (Lead)',
+              userId: registry.currentUserId,
+              displayName: registry.activeMembers[0]?.displayName ?? 'Francis (Lead)',
               color: '#8b5cf6'
             }}
             onPersist={handleNotesChange}

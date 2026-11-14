@@ -62,9 +62,20 @@ export type TeamKanbanBoard = {
   updatedAt: number
 }
 
-export type WhiteboardItemType = 'sticky' | 'mermaid' | 'text'
+export type WhiteboardItemType = 'sticky' | 'mermaid' | 'text' | 'spec' | 'shape' | 'draw' | 'arrow'
 
 export type WhiteboardColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple' | 'orange'
+
+export type WhiteboardShapeKind = 'rect' | 'ellipse' | 'diamond'
+
+export type WhiteboardFillStyle = 'tinted' | 'solid' | 'outline'
+
+export type WhiteboardFontSize = 'sm' | 'md' | 'lg'
+
+export type WhiteboardPoint = {
+  x: number
+  y: number
+}
 
 export type TeamWhiteboardItem = {
   id: string
@@ -76,6 +87,22 @@ export type TeamWhiteboardItem = {
   content: string
   color?: WhiteboardColor
   title?: string
+  shapeKind?: WhiteboardShapeKind
+  strokeColor?: string
+  strokeWidth?: number
+  fillStyle?: WhiteboardFillStyle
+  /**
+   * Coordinates relative to the item's (x, y) bounding-box origin.
+   * For 'draw', represents the freehand polyline points.
+   * For 'arrow', represents [startPoint, endPoint] relative to (x, y).
+   */
+  points?: WhiteboardPoint[]
+  fromId?: string
+  toId?: string
+  endX?: number
+  endY?: number
+  zIndex?: number
+  fontSize?: WhiteboardFontSize
 }
 
 export type TeamWhiteboard = {

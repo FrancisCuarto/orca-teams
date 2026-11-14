@@ -17,7 +17,7 @@ import { useOnboardingFlow } from './use-onboarding-flow'
 import { OnboardingSkipConfirmationDialog } from './OnboardingSkipConfirmationDialog'
 import { OnboardingFooter } from './OnboardingFooter'
 import { shouldRequestOnboardingSkipConfirmation } from './onboarding-dismiss-target'
-import logo from '../../../../../resources/logo.svg'
+import logo from '../../../../../resources/icon.png'
 import { useTranslate } from '@/i18n/use-translate'
 import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
 import { useScrollEdgeFades } from '@/lib/list-interaction/use-scroll-edge-fades'
@@ -139,7 +139,7 @@ export default function OnboardingFlow({
                   src={logo}
                   alt=""
                   aria-hidden="true"
-                  className="h-7 w-auto shrink-0 invert dark:invert-0"
+                  className="size-7 shrink-0 rounded-md object-contain"
                 />
                 <span>{t('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca')}</span>
               </div>
