@@ -1,5 +1,6 @@
-import { useCallback, useEffect } from 'react'
+import { Suspense, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { lazyWithRetry as lazy } from './app-shell/startup/lazy-with-retry'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConfirmationDialogProvider } from './components/confirmation-dialog'
@@ -42,8 +43,11 @@ import { PlainSshTerminalPanels } from './components/plain-ssh-terminal/PlainSsh
 import { PluginShotReplayMount } from './components/plugins/view/PluginShotReplayMount'
 import { AddToChatPointMenuHost } from './components/native-chat/selection-quotes/AddToChatMenu'
 import { installActiveWorktreeRemovalSuccessor } from './lib/workspace/activation/active-worktree-removal-successor'
+import { isTeamsPortalLocation } from './components/team/storage/team-web-relay-api'
 
-function App(): React.JSX.Element {
+const TeamWebPortalShell = lazy(() => import('./components/team/TeamWebPortalShell'))
+
+function DesktopApp(): React.JSX.Element {
   const layout = useAppChromeLayout()
   const floatingWorkspace = useFloatingWorkspacePanel()
   const onboardingGate = useOnboardingAndFeatureTips()
@@ -134,6 +138,23 @@ function App(): React.JSX.Element {
       {hasCustomTitleBar && <WindowControls />}
     </div>
   )
+}
+
+function App(): React.JSX.Element {
+  if (isTeamsPortalLocation()) {
+    return (
+      <>
+        <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+          <TeamWebPortalShell />
+        </Suspense>
+        {createPortal(
+          <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />,
+          document.body
+        )}
+      </>
+    )
+  }
+  return <DesktopApp />
 }
 
 export default App

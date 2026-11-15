@@ -5,19 +5,15 @@ import type {
   TeamSendInvitationResult
 } from '../../../../../shared/teamwork/team-ipc-types'
 import type { Project, Team, TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
-export function getTeamPreloadApi() {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-  return window.api?.team
-}
+export { getTeamsTeamApi, getTeamsTeamApi as getTeamPreloadApi }
 
 export async function createTeamAction(
   newTeam: Omit<Team, 'createdAt' | 'updatedAt'>,
   ownerId: string
 ): Promise<Team> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (teamApi?.createTeam) {
     return teamApi.createTeam({
       name: newTeam.name,
@@ -34,7 +30,7 @@ export async function createProjectAction(
   newProj: Omit<Project, 'createdAt' | 'updatedAt'>,
   actorUserId: string
 ): Promise<Project> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (teamApi?.createProject) {
     return teamApi.createProject({
       teamId: newProj.teamId,
@@ -57,7 +53,7 @@ export async function sendTeamInvitationAction(params: {
   invitedBy: string
   inviterName: string
 }): Promise<TeamSendInvitationResult> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (!teamApi?.sendInvitation) {
     const now = Date.now()
     const token = `inv-${now}-${Math.random().toString(36).slice(2, 8)}`
@@ -76,7 +72,7 @@ export async function sendTeamInvitationAction(params: {
       joinUrl: `orca://team/join?token=${token}`,
       emailSent: false,
       needsMailConfig: true,
-      error: 'El servicio IPC de correo no está disponible fuera de Electron.'
+      error: 'El servicio de correo no está disponible en este entorno.'
     }
   }
   return teamApi.sendInvitation(params)
@@ -86,9 +82,9 @@ export async function resendTeamInvitationAction(
   invitationId: string,
   inviterName: string
 ): Promise<TeamSendInvitationResult> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (!teamApi?.resendInvitation) {
-    throw new Error('El servicio IPC de correo no está disponible')
+    throw new Error('El servicio de correo no está disponible')
   }
   return teamApi.resendInvitation(invitationId, inviterName)
 }
@@ -99,9 +95,9 @@ export async function acceptTeamInvitationAction(
   displayName?: string,
   email?: string
 ): Promise<TeamMemberWithProfile> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (!teamApi?.acceptInvitation) {
-    throw new Error('El servicio IPC de invitaciones no está disponible')
+    throw new Error('El servicio de invitaciones no está disponible')
   }
   return teamApi.acceptInvitation(token.trim(), userId, displayName?.trim(), email?.trim())
 }
@@ -109,9 +105,9 @@ export async function acceptTeamInvitationAction(
 export async function saveTeamMailConfigAction(
   input: TeamMailConfigInput
 ): Promise<TeamMailConfigPublic> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (!teamApi?.saveMailConfig) {
-    throw new Error('El servicio IPC de configuración de correo no está disponible')
+    throw new Error('El servicio de configuración de correo no está disponible')
   }
   return teamApi.saveMailConfig(input)
 }
@@ -119,9 +115,9 @@ export async function saveTeamMailConfigAction(
 export async function testTeamMailConfigAction(
   toEmail: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const teamApi = getTeamPreloadApi()
+  const teamApi = getTeamsTeamApi()
   if (!teamApi?.testMailConfig) {
-    return { ok: false, error: 'El servicio IPC de correo no está disponible' }
+    return { ok: false, error: 'El servicio de correo no está disponible' }
   }
   return teamApi.testMailConfig(toEmail)
 }

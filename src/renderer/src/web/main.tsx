@@ -1,9 +1,11 @@
 import '../assets/main.css'
 
 import { Suspense, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { lazyWithRetry as lazy } from '@/app-shell/startup/lazy-with-retry'
 import ReactDOM from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
+import { Toaster } from '@/components/ui/sonner'
 import WebConnect from './WebConnect'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import {
@@ -24,6 +26,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import { installOsFileDropCancellationGuard } from '../lib/files/drop/os-file-drop-cancellation-guard'
 import { installBodyOverlayAttributes } from '../lib/overlay-interaction/body-overlay-attributes'
 import { installAppKeyboardRouter } from '../lib/keyboard/app-keyboard-router'
+import { isTeamsPortalLocation } from '../components/team/storage/team-web-relay-api'
 
 const disposeOsFileDropGuard = installOsFileDropCancellationGuard()
 import.meta.hot?.dispose(disposeOsFileDropGuard)
@@ -31,8 +34,9 @@ const disposeBodyOverlayAttributes = installBodyOverlayAttributes()
 import.meta.hot?.dispose(disposeBodyOverlayAttributes)
 installAppKeyboardRouter()
 const App = lazy(() => import('../App'))
+const TeamWebPortalShell = lazy(() => import('../components/team/TeamWebPortalShell'))
 
-function WebRoot(): React.JSX.Element {
+function WebIdeRoot(): React.JSX.Element {
   const initialPairingInput = useMemo(() => readPairingInputFromLocation(window.location), [])
   // Why: current runtime links carry scope metadata. Runtime-scope offers keep
   // the instant save path; mobile/legacy-unknown offers must be shown/probed.
@@ -88,6 +92,23 @@ function WebRoot(): React.JSX.Element {
       <WebPairingSecurityNotice />
     </>
   )
+}
+
+function WebRoot(): React.JSX.Element {
+  if (isTeamsPortalLocation(window.location)) {
+    return (
+      <>
+        <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+          <TeamWebPortalShell />
+        </Suspense>
+        {createPortal(
+          <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />,
+          document.body
+        )}
+      </>
+    )
+  }
+  return <WebIdeRoot />
 }
 
 function WebRootBoundary(): React.JSX.Element {

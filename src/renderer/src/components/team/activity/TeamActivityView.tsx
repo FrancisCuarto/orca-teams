@@ -7,7 +7,7 @@ import type {
   TeamActivityActorType,
   TeamActivityEntry
 } from '../../../../../shared/teamwork/team-workspace-types'
-import { getTeamPreloadApi } from '../hooks/use-team-workspace-registry-actions'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
 type Props = {
   teamId: string
@@ -22,7 +22,7 @@ export function TeamActivityView({ teamId, projectId }: Props): React.JSX.Elemen
   const [filter, setFilter] = useState<ActorFilter>('all')
 
   const loadActivity = useCallback(async () => {
-    const teamApi = getTeamPreloadApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi?.listActivity) {
       setLoading(false)
       return

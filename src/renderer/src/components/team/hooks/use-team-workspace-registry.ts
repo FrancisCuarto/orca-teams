@@ -20,11 +20,11 @@ import {
   type TeamPermissions
 } from '../../../../../shared/teamwork/team-rbac-policy'
 import type { ExtendedTeamMember } from '../../../../../shared/teamwork/team-kanban-types'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 import {
   acceptTeamInvitationAction,
   createProjectAction,
   createTeamAction,
-  getTeamPreloadApi,
   resendTeamInvitationAction,
   saveTeamMailConfigAction,
   sendTeamInvitationAction,
@@ -105,7 +105,7 @@ export function useTeamWorkspaceRegistry(options: {
   const [mailConfig, setMailConfig] = useState<TeamMailConfigPublic | null>(null)
 
   const loadWorkspace = useCallback(async () => {
-    const teamApi = getTeamPreloadApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi) {
       return
     }
@@ -166,11 +166,11 @@ export function useTeamWorkspaceRegistry(options: {
     [activeTeam, invitationsByTeam]
   )
 
+  const rawUserId = options.currentUserId?.trim() || options.currentUser?.userId?.trim()
   const currentUserId =
-    options.currentUserId?.trim() ||
-    options.currentUser?.userId?.trim() ||
-    activeTeam?.ownerId ||
-    defaultOwnerMember.userId
+    rawUserId && rawUserId !== 'local-owner'
+      ? rawUserId
+      : (activeTeam?.ownerId ?? defaultOwnerMember.userId)
   const explicitMember = activeMembers.find((m) => m.userId === currentUserId)
   const currentUserMember = explicitMember ?? (hasLoadedSnapshot ? undefined : activeMembers[0])
   const currentUserName = currentUserMember?.displayName ?? 'Francis (Lead)'
@@ -298,7 +298,7 @@ export function useTeamWorkspaceRegistry(options: {
         toast.error('Permisos insuficientes: se requiere rol admin u owner para revocar')
         return
       }
-      const teamApi = getTeamPreloadApi()
+      const teamApi = getTeamsTeamApi()
       if (teamApi?.revokeInvitation) {
         await teamApi.revokeInvitation(invitationId, currentUserId)
       }

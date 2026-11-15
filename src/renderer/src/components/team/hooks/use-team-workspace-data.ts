@@ -13,6 +13,7 @@ import {
   saveTeamNotes,
   saveTeamWhiteboard
 } from '../storage/team-storage'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
 const DISK_SAVE_DEBOUNCE_MS = 350
 
@@ -55,6 +56,10 @@ export function useTeamWorkspaceData(options: {
     clearPendingSaveTimers()
     setLoading(true)
     try {
+      const teamApi = getTeamsTeamApi()
+      if (teamApi && !projectPath) {
+        await teamApi.getSyncStatus().catch(() => null)
+      }
       const [loadedBoard, loadedWhiteboard, loadedNotes] = await Promise.all([
         loadTeamBoard(projectPath, projectId, 'default-sprint', connectionId),
         loadTeamWhiteboard(projectPath, projectId, connectionId),
