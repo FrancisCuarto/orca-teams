@@ -67,6 +67,7 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
     isolateWorktree: input.isolateWorktree,
     requiresApproval: input.requiresApproval,
+    reviewRequest: existingCard?.reviewRequest,
     blockedReason: input.blockedReason.trim() || undefined,
     createdAt: existingCard?.createdAt ?? Date.now(),
     updatedAt: Date.now()

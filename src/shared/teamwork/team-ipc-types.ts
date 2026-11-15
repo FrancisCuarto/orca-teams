@@ -105,6 +105,26 @@ export type TeamSyncRuntimeStatus = {
 export type TeamApproveExecutionRequest = {
   executionId: string
   mergeToBase?: boolean
+  createPullRequestOnApprove?: boolean
+  projectPath?: string | null
+  title?: string
+  body?: string
+  actorUserId?: string
+  actorName?: string
+}
+
+export type TeamCreateReviewRequestRequest = {
+  executionId: string
+  projectPath?: string | null
+  title?: string
+  body?: string
+  actorUserId?: string
+  actorName?: string
+}
+
+export type TeamRefreshReviewRequestRequest = {
+  executionId: string
+  projectPath?: string | null
   actorUserId?: string
   actorName?: string
 }
@@ -122,6 +142,12 @@ export type TeamApi = {
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   approveExecution: (request: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
+  createReviewRequest: (
+    request: TeamCreateReviewRequestRequest
+  ) => Promise<AgentExecutionRecord | null>
+  refreshReviewRequest: (
+    request: TeamRefreshReviewRequestRequest
+  ) => Promise<AgentExecutionRecord | null>
   rejectExecution: (request: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
   getExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   getLatestExecutionForCard: (cardId: string) => Promise<AgentExecutionRecord | null>

@@ -199,6 +199,7 @@ export class TeamHostDatabase {
              base_branch = COALESCE(?, base_branch),
              approval_status = COALESCE(?, approval_status),
              changed_files_json = COALESCE(?, changed_files_json),
+             review_request_json = COALESCE(?, review_request_json),
              started_at = COALESCE(?, started_at),
              completed_at = COALESCE(?, completed_at),
              updated_at = ?
@@ -214,6 +215,7 @@ export class TeamHostDatabase {
         record.baseBranch ?? null,
         record.approvalStatus ?? null,
         record.changedFiles ? JSON.stringify(record.changedFiles) : null,
+        record.reviewRequest ? JSON.stringify(record.reviewRequest) : null,
         record.startedAt ?? null,
         record.completedAt ?? null,
         record.updatedAt,

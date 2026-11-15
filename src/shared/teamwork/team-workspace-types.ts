@@ -169,6 +169,55 @@ export type AgentApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export const AgentApprovalStatusSchema = z.enum(['pending', 'approved', 'rejected'])
 
+export type TeamReviewProvider = 'github' | 'gitlab'
+
+export const TeamReviewProviderSchema = z.enum(['github', 'gitlab'])
+
+export type TeamReviewRequestState = 'open' | 'merged' | 'closed'
+
+export const TeamReviewRequestStateSchema = z.enum(['open', 'merged', 'closed'])
+
+export type TeamReviewRequest = {
+  provider: TeamReviewProvider
+  number: number
+  url: string
+  state: TeamReviewRequestState
+}
+
+export const TeamReviewRequestSchema = z.object({
+  provider: TeamReviewProviderSchema,
+  number: z.number().int().positive(),
+  url: z.string().url(),
+  state: TeamReviewRequestStateSchema
+})
+
+export function isTeamReviewProvider(value: unknown): value is TeamReviewProvider {
+  return value === 'github' || value === 'gitlab'
+}
+
+export function isTeamReviewRequestState(value: unknown): value is TeamReviewRequestState {
+  return value === 'open' || value === 'merged' || value === 'closed'
+}
+
+export function isTeamReviewRequest(value: unknown): value is TeamReviewRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  return (
+    'provider' in value &&
+    isTeamReviewProvider(value.provider) &&
+    'number' in value &&
+    typeof value.number === 'number' &&
+    Number.isInteger(value.number) &&
+    value.number > 0 &&
+    'url' in value &&
+    typeof value.url === 'string' &&
+    value.url.length > 0 &&
+    'state' in value &&
+    isTeamReviewRequestState(value.state)
+  )
+}
+
 export type AgentExecutionRecord = {
   id: string
   taskId: string
@@ -183,6 +232,7 @@ export type AgentExecutionRecord = {
   baseBranch?: string
   approvalStatus?: AgentApprovalStatus
   changedFiles?: string[]
+  reviewRequest?: TeamReviewRequest
   logs: AgentExecutionLog[]
   outputSummary?: string
   idempotencyKey: string
@@ -207,6 +257,7 @@ export const AgentExecutionRecordSchema = z.object({
   baseBranch: z.string().optional(),
   approvalStatus: AgentApprovalStatusSchema.optional(),
   changedFiles: z.array(z.string()).optional(),
+  reviewRequest: TeamReviewRequestSchema.optional(),
   logs: z.array(AgentExecutionLogSchema),
   outputSummary: z.string().optional(),
   idempotencyKey: z.string().min(1),

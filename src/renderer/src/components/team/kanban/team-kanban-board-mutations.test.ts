@@ -4,6 +4,7 @@ import type {
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
 import {
+  applyReviewRequestToKanbanCard,
   computeBoardSprintMetrics,
   extractActionItemsFromMarkdownToBoard,
   moveKanbanCardAcrossColumns,
@@ -377,5 +378,34 @@ describe('computeBoardSprintMetrics', () => {
       humanCards: 0,
       workloadByAssignee: {}
     })
+  })
+})
+
+describe('applyReviewRequestToKanbanCard', () => {
+  it('attaches reviewRequest metadata and auto-moves card to done column when merged', () => {
+    const openResult = applyReviewRequestToKanbanCard(makeBoard(), 'card-3', {
+      provider: 'github',
+      number: 12,
+      url: 'https://github.com/org/repo/pull/12',
+      state: 'open'
+    })
+    expect(openResult.movedToDone).toBe(false)
+    expect(openResult.nextBoard.cards['card-3']?.columnId).toBe('col-doing')
+    expect(openResult.nextBoard.cards['card-3']?.reviewRequest?.number).toBe(12)
+
+    const mergedResult = applyReviewRequestToKanbanCard(openResult.nextBoard, 'card-3', {
+      provider: 'github',
+      number: 12,
+      url: 'https://github.com/org/repo/pull/12',
+      state: 'merged'
+    })
+    expect(mergedResult.movedToDone).toBe(true)
+    expect(mergedResult.nextBoard.cards['card-3']?.columnId).toBe('col-done')
+    expect(mergedResult.nextBoard.columns.find((c) => c.id === 'col-done')?.cardIds).toContain(
+      'card-3'
+    )
+    expect(mergedResult.nextBoard.columns.find((c) => c.id === 'col-doing')?.cardIds).not.toContain(
+      'card-3'
+    )
   })
 })

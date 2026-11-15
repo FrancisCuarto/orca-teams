@@ -8,7 +8,10 @@ import type {
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
-import { computeBoardSprintMetrics } from './team-kanban-board-mutations'
+import {
+  applyReviewRequestToKanbanCard,
+  computeBoardSprintMetrics
+} from './team-kanban-board-mutations'
 import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
 import { TeamKanbanCardModal } from './TeamKanbanCardModal'
 import { TeamKanbanColumnsViewport } from './TeamKanbanColumnsViewport'
@@ -55,6 +58,8 @@ export function TeamKanbanBoardView({
     startCardExecution,
     cancelExecution,
     approveExecution,
+    createReviewRequest,
+    refreshReviewRequest,
     rejectExecution,
     hydrateLatestForCard
   } = useTeamAgentExecutions()
@@ -111,6 +116,100 @@ export function TeamKanbanBoardView({
       toast.success(`Columna "${newCol.title}" creada`)
     },
     [board, onChange]
+  )
+
+  const syncReviewResultToBoard = useCallback(
+    (
+      updated: Awaited<ReturnType<typeof approveExecution>>,
+      mode: 'created' | 'refreshed'
+    ): void => {
+      if (!updated) {
+        return
+      }
+      if (updated.error) {
+        toast.error(updated.error)
+        return
+      }
+      if (!updated.reviewRequest) {
+        return
+      }
+      const { nextBoard, movedToDone } = applyReviewRequestToKanbanCard(
+        board,
+        updated.taskId,
+        updated.reviewRequest
+      )
+      onChange(nextBoard)
+      const label = updated.reviewRequest.provider === 'gitlab' ? 'MR' : 'PR'
+      if (mode === 'created') {
+        toast.success(`${label} #${updated.reviewRequest.number} creado`)
+      } else if (movedToDone) {
+        toast.success(
+          `${label} #${updated.reviewRequest.number} fusionado. Tarjeta movida a Completado.`
+        )
+      } else {
+        toast.info(
+          `Estado de ${label} #${updated.reviewRequest.number}: ${updated.reviewRequest.state}`
+        )
+      }
+    },
+    [board, onChange]
+  )
+
+  const handleApproveAndCreateReview = useCallback(
+    async (executionId: string): Promise<void> => {
+      const updated = await approveExecution({
+        executionId,
+        mergeToBase: false,
+        createPullRequestOnApprove: true,
+        projectPath,
+        title: executionModalCard?.title,
+        actorUserId: currentUserId,
+        actorName: currentUserName
+      })
+      syncReviewResultToBoard(updated, 'created')
+    },
+    [
+      approveExecution,
+      projectPath,
+      executionModalCard?.title,
+      currentUserId,
+      currentUserName,
+      syncReviewResultToBoard
+    ]
+  )
+
+  const handleCreateReviewRequest = useCallback(
+    async (executionId: string): Promise<void> => {
+      const updated = await createReviewRequest({
+        executionId,
+        projectPath,
+        title: executionModalCard?.title,
+        actorUserId: currentUserId,
+        actorName: currentUserName
+      })
+      syncReviewResultToBoard(updated, 'created')
+    },
+    [
+      createReviewRequest,
+      projectPath,
+      executionModalCard?.title,
+      currentUserId,
+      currentUserName,
+      syncReviewResultToBoard
+    ]
+  )
+
+  const handleRefreshReviewRequest = useCallback(
+    async (executionId: string): Promise<void> => {
+      const updated = await refreshReviewRequest({
+        executionId,
+        projectPath,
+        actorUserId: currentUserId,
+        actorName: currentUserName
+      })
+      syncReviewResultToBoard(updated, 'refreshed')
+    },
+    [refreshReviewRequest, projectPath, currentUserId, currentUserName, syncReviewResultToBoard]
   )
 
   return (
@@ -202,6 +301,9 @@ export function TeamKanbanBoardView({
             actorName: currentUserName
           })
         }
+        onApproveAndCreateReview={handleApproveAndCreateReview}
+        onCreateReviewRequest={handleCreateReviewRequest}
+        onRefreshReviewRequest={handleRefreshReviewRequest}
         onReject={(executionId, discardWorktree) =>
           void rejectExecution({
             executionId,

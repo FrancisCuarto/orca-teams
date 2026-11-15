@@ -4,7 +4,9 @@ import { homedir } from 'node:os'
 import type { AgentExecutionRecord } from '../../shared/teamwork/team-workspace-types'
 import type {
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
   TeamExecutionEvent,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
@@ -16,13 +18,22 @@ import {
   extractCardAgentAssignment,
   resolveAgentCommand
 } from './team-agent-command'
-import { applyExecutionApproval, applyExecutionRejection } from './team-agent-approval'
+import {
+  applyCreateReviewRequest,
+  applyExecutionApproval,
+  applyExecutionRejection,
+  applyRefreshReviewRequest
+} from './team-agent-approval'
 import {
   appendExecutionLog,
   cloneExecutionRecord,
   resolveWorkingDirectory,
   wireAgentChildProcess
 } from './team-agent-process-stream'
+import type {
+  pushAndCreateReviewRequest,
+  queryReviewRequestState
+} from './team-review-provider'
 import {
   inspectWorktreeChanges,
   provisionCardWorktree,
@@ -53,6 +64,8 @@ export type TeamAgentRunnerDeps = {
   inspectWorktreeChanges?: (worktreePath: string) => Promise<string[]>
   mergeWorktreeToBase?: typeof mergeWorktreeToBase
   discardWorktree?: typeof discardCardWorktree
+  createReviewRequest?: typeof pushAndCreateReviewRequest
+  queryReviewRequestState?: typeof queryReviewRequestState
   onPersistExecution?: (record: AgentExecutionRecord) => void
   onLookupPersistedExecution?: (executionId: string) => AgentExecutionRecord | null
   onLookupLatestForCard?: (cardId: string) => AgentExecutionRecord | null
@@ -217,10 +230,49 @@ export class TeamAgentRunner {
     if (!record) {
       return null
     }
+    if (request.createPullRequestOnApprove) {
+      const hydrate = this.deps.hydrateShellPath ?? (() => hydrateShellPathForAgentDetection())
+      await hydrate()
+    }
     return applyExecutionApproval({
       record,
       request,
       mergeWorktreeToBaseFn: this.deps.mergeWorktreeToBase,
+      createReviewRequestFn: this.deps.createReviewRequest,
+      onPersistAndEmit: (updated) => this.emitUpdated(updated)
+    })
+  }
+
+  async createReviewRequest(
+    request: TeamCreateReviewRequestRequest
+  ): Promise<AgentExecutionRecord | null> {
+    const record = this.loadMutableExecution(request.executionId)
+    if (!record) {
+      return null
+    }
+    const hydrate = this.deps.hydrateShellPath ?? (() => hydrateShellPathForAgentDetection())
+    await hydrate()
+    return applyCreateReviewRequest({
+      record,
+      request,
+      createReviewRequestFn: this.deps.createReviewRequest,
+      onPersistAndEmit: (updated) => this.emitUpdated(updated)
+    })
+  }
+
+  async refreshReviewRequest(
+    request: TeamRefreshReviewRequestRequest
+  ): Promise<AgentExecutionRecord | null> {
+    const record = this.loadMutableExecution(request.executionId)
+    if (!record) {
+      return null
+    }
+    const hydrate = this.deps.hydrateShellPath ?? (() => hydrateShellPathForAgentDetection())
+    await hydrate()
+    return applyRefreshReviewRequest({
+      record,
+      request,
+      queryReviewRequestStateFn: this.deps.queryReviewRequestState,
       onPersistAndEmit: (updated) => this.emitUpdated(updated)
     })
   }

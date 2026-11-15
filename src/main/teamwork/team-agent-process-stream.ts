@@ -35,6 +35,7 @@ export function cloneExecutionRecord(record: AgentExecutionRecord): AgentExecuti
   return {
     ...record,
     ...(record.changedFiles ? { changedFiles: [...record.changedFiles] } : {}),
+    ...(record.reviewRequest ? { reviewRequest: { ...record.reviewRequest } } : {}),
     logs: record.logs.map((entry) => ({ ...entry }))
   }
 }

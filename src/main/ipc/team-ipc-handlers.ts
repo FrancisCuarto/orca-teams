@@ -2,7 +2,9 @@ import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import type {
   TeamApi,
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
   TeamExecutionEvent,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamSendInvitationRequest,
   TeamSendInvitationResult,
@@ -144,25 +146,105 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
   )
 
   ipcMain.handle('team:approveExecution', async (_event, request: TeamApproveExecutionRequest) => {
+    const hadReviewBefore = Boolean(runner.getExecution(request.executionId)?.reviewRequest)
     const updated = await runner.approveExecution(request)
     if (updated) {
       broadcastExecutionEvent({ type: 'updated', execution: updated })
+      const actorId = request.actorUserId ?? 'local-owner'
+      const actorName = request.actorName ?? request.actorUserId ?? 'Equipo'
+      const teamId = resolveTeamIdForProject(updated.projectId)
       recordSystemActivity({
-        teamId: resolveTeamIdForProject(updated.projectId),
+        teamId,
         projectId: updated.projectId,
-        actorId: request.actorUserId ?? 'local-owner',
-        actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+        actorId,
+        actorName,
         actorType: 'human',
         action: 'execution.approved',
         targetType: 'execution',
         targetId: updated.id,
         summary: request.mergeToBase
           ? `Aprobó y fusionó cambios de ${updated.agentId} (${updated.branchOrWorktree ?? updated.taskId})`
-          : `Aprobó cambios de ${updated.agentId}`
+          : request.createPullRequestOnApprove && updated.reviewRequest
+            ? `Aprobó cambios de ${updated.agentId} y abrió ${updated.reviewRequest.provider === 'gitlab' ? 'MR' : 'PR'} #${updated.reviewRequest.number}`
+            : `Aprobó cambios de ${updated.agentId}`
       })
+      if (updated.reviewRequest && !hadReviewBefore && !updated.error) {
+        const providerLabel = updated.reviewRequest.provider === 'gitlab' ? 'GitLab MR' : 'GitHub PR'
+        recordSystemActivity({
+          teamId,
+          projectId: updated.projectId,
+          actorId,
+          actorName,
+          actorType: 'human',
+          action: 'review_request.created',
+          targetType: 'execution',
+          targetId: updated.id,
+          summary: `Creó ${providerLabel} #${updated.reviewRequest.number} (${updated.reviewRequest.url})`,
+          metadata: { reviewRequest: updated.reviewRequest }
+        })
+      }
     }
     return updated
   })
+
+  ipcMain.handle(
+    'team:createReviewRequest',
+    async (_event, request: TeamCreateReviewRequestRequest) => {
+      const updated = await runner.createReviewRequest(request)
+      if (updated) {
+        broadcastExecutionEvent({ type: 'updated', execution: updated })
+        if (updated.reviewRequest && !updated.error) {
+          const providerLabel =
+            updated.reviewRequest.provider === 'gitlab' ? 'GitLab MR' : 'GitHub PR'
+          recordSystemActivity({
+            teamId: resolveTeamIdForProject(updated.projectId),
+            projectId: updated.projectId,
+            actorId: request.actorUserId ?? 'local-owner',
+            actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+            actorType: 'human',
+            action: 'review_request.created',
+            targetType: 'execution',
+            targetId: updated.id,
+            summary: `Creó ${providerLabel} #${updated.reviewRequest.number} (${updated.reviewRequest.url})`,
+            metadata: { reviewRequest: updated.reviewRequest }
+          })
+        }
+      }
+      return updated
+    }
+  )
+
+  ipcMain.handle(
+    'team:refreshReviewRequest',
+    async (_event, request: TeamRefreshReviewRequestRequest) => {
+      const prevState = runner.getExecution(request.executionId)?.reviewRequest?.state
+      const updated = await runner.refreshReviewRequest(request)
+      if (updated) {
+        broadcastExecutionEvent({ type: 'updated', execution: updated })
+        if (
+          updated.reviewRequest &&
+          updated.reviewRequest.state === 'merged' &&
+          prevState !== 'merged'
+        ) {
+          const providerLabel =
+            updated.reviewRequest.provider === 'gitlab' ? 'GitLab MR' : 'GitHub PR'
+          recordSystemActivity({
+            teamId: resolveTeamIdForProject(updated.projectId),
+            projectId: updated.projectId,
+            actorId: request.actorUserId ?? 'local-owner',
+            actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+            actorType: 'system',
+            action: 'review_request.merged',
+            targetType: 'execution',
+            targetId: updated.id,
+            summary: `${providerLabel} #${updated.reviewRequest.number} fusionado (${updated.reviewRequest.url})`,
+            metadata: { reviewRequest: updated.reviewRequest }
+          })
+        }
+      }
+      return updated
+    }
+  )
 
   ipcMain.handle('team:rejectExecution', async (_event, request: TeamRejectExecutionRequest) => {
     const updated = await runner.rejectExecution(request)

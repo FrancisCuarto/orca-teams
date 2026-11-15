@@ -3,8 +3,10 @@ import type { PreloadApi } from '../api-types'
 import type {
   TeamApi,
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
   TeamExecutionEvent,
   TeamMailConfigInput,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamSendInvitationRequest,
   TeamStartExecutionRequest
@@ -22,6 +24,10 @@ export const teamApi: TeamApi = {
   cancelExecution: (executionId: string) => ipcRenderer.invoke('team:cancelExecution', executionId),
   approveExecution: (request: TeamApproveExecutionRequest) =>
     ipcRenderer.invoke('team:approveExecution', request),
+  createReviewRequest: (request: TeamCreateReviewRequestRequest) =>
+    ipcRenderer.invoke('team:createReviewRequest', request),
+  refreshReviewRequest: (request: TeamRefreshReviewRequestRequest) =>
+    ipcRenderer.invoke('team:refreshReviewRequest', request),
   rejectExecution: (request: TeamRejectExecutionRequest) =>
     ipcRenderer.invoke('team:rejectExecution', request),
   getExecution: (executionId: string) => ipcRenderer.invoke('team:getExecution', executionId),
