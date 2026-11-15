@@ -43,6 +43,8 @@ type Props = {
   pendingInvitations?: TeamInvitation[]
   mailConfig?: TeamMailConfigPublic | null
   userRole: TeamRole
+  initialJoinToken?: string | null
+  onClearPendingJoin?: () => void
   onOpenChange: (open: boolean) => void
   onInviteMember: (email: string, role: TeamRole) => Promise<TeamSendInvitationResult>
   onResendInvitation?: (invitationId: string) => Promise<TeamSendInvitationResult>
@@ -52,27 +54,27 @@ type Props = {
   onTestMailConfig?: (toEmail: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function TeamMembersModal({
-  open,
+function TeamMembersModalBody({
   teamName,
   members,
   pendingInvitations = EMPTY_INVITATIONS,
   mailConfig = null,
   userRole,
-  onOpenChange,
+  initialJoinToken = null,
+  onClearPendingJoin,
   onInviteMember,
   onResendInvitation,
   onRevokeInvitation,
   onAcceptInvitation,
   onSaveMailConfig,
   onTestMailConfig
-}: Props): React.JSX.Element {
+}: Omit<Props, 'open' | 'onOpenChange'>): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [selectedRole, setSelectedRole] = useState<TeamRole>('member')
   const [lastResult, setLastResult] = useState<TeamSendInvitationResult | null>(null)
   const [showMailConfig, setShowMailConfig] = useState(false)
-  const [showRedeem, setShowRedeem] = useState(false)
-  const [redeemToken, setRedeemToken] = useState('')
+  const [showRedeem, setShowRedeem] = useState(Boolean(initialJoinToken))
+  const [redeemToken, setRedeemToken] = useState(initialJoinToken ?? '')
   const [redeemName, setRedeemName] = useState('')
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -130,14 +132,14 @@ export function TeamMembersModal({
       setRedeemToken('')
       setRedeemName('')
       setShowRedeem(false)
+      onClearPendingJoin?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Código inválido o expirado')
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+    <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 pr-6">
             <DialogTitle>
@@ -347,6 +349,20 @@ export function TeamMembersModal({
             </div>
           </div>
         </div>
+    </>
+  )
+}
+
+export function TeamMembersModal({
+  open,
+  onOpenChange,
+  ...bodyProps
+}: Props): React.JSX.Element {
+  const modalBodyKey = `${bodyProps.teamName}:${bodyProps.initialJoinToken ?? 'none'}`
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <TeamMembersModalBody key={modalBodyKey} {...bodyProps} />
       </DialogContent>
     </Dialog>
   )

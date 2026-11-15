@@ -117,6 +117,12 @@ export type TeamRejectExecutionRequest = {
   actorName?: string
 }
 
+export type TeamDeepLinkJoinPayload = {
+  token: string
+  rawUrl: string
+  relayUrl?: string
+}
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
@@ -126,6 +132,8 @@ export type TeamApi = {
   getExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   getLatestExecutionForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
   onExecutionEvent: (callback: (event: TeamExecutionEvent) => void) => () => void
+  onDeepLinkJoin: (callback: (payload: TeamDeepLinkJoinPayload) => void) => () => void
+  consumePendingDeepLinkJoin: () => Promise<TeamDeepLinkJoinPayload | null>
   getWorkspaceSnapshot: () => Promise<TeamWorkspaceSnapshot>
   createTeam: (input: {
     name: string
