@@ -22,6 +22,8 @@ type Props = {
   permissions?: TeamPermissions
   relayUrl?: string | null
   syncToken?: string
+  selectedNoteId?: string | null
+  onSelectNoteId?: (noteId: string | null) => void
   onPersist?: (notes: TeamNotesCollection) => void
   onPeersChange?: (peers: CollaboratorPresence[]) => void
   onExtractTasksToKanban?: (noteTitle: string, content: string) => void
@@ -35,6 +37,8 @@ export function TeamNotesConnectedView({
   permissions,
   relayUrl,
   syncToken,
+  selectedNoteId,
+  onSelectNoteId,
   onPersist,
   onPeersChange,
   onExtractTasksToKanban
@@ -55,10 +59,13 @@ export function TeamNotesConnectedView({
     <TeamNotesView
       notesCollection={notesCollection ?? initialNotes}
       peers={peers}
-      activeNoteId={activeNoteId}
+      activeNoteId={selectedNoteId !== undefined ? selectedNoteId : activeNoteId}
       readOnly={!resolvedPermissions.canEditNotes}
       canExtractToKanban={resolvedPermissions.canEditBoard}
-      onSelectNoteId={setActiveNoteId}
+      onSelectNoteId={(id) => {
+        setActiveNoteId(id)
+        onSelectNoteId?.(id)
+      }}
       onChange={(updated) => {
         if (resolvedPermissions.canEditNotes) {
           syncNotesCollection(updated)

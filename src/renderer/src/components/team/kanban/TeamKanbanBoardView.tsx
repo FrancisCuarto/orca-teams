@@ -14,6 +14,7 @@ import {
   getTeamPermissions,
   type TeamPermissions
 } from '../../../../../shared/teamwork/team-rbac-policy'
+import { DEFAULT_TEAM_HUMAN_MEMBERS } from '../../../../../shared/teamwork/team-members'
 import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
 import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
@@ -50,6 +51,8 @@ type Props = {
   peers?: CollaboratorPresence[]
   onActiveCardChange?: (cardId?: string) => void
   availableNotes?: TeamNote[]
+  selectedCardId?: string | null
+  onSelectedCardIdChange?: (cardId: string | null) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -67,6 +70,8 @@ export function TeamKanbanBoardView({
   peers,
   onActiveCardChange,
   availableNotes,
+  selectedCardId = null,
+  onSelectedCardIdChange,
   onChange
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
@@ -105,7 +110,34 @@ export function TeamKanbanBoardView({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const cardMap = useMemo(() => board.cards, [board.cards])
   const metrics = useMemo(() => computeBoardSprintMetrics(board), [board])
-  const filters = useKanbanBoardFilters(board.columns, cardMap)
+
+  const pendingApprovalCardIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const [cardId, record] of executionsByCard.entries()) {
+      if (record.status === 'waiting_for_input') {
+        ids.add(cardId)
+      }
+    }
+    return ids
+  }, [executionsByCard])
+
+  const allBoardMembers = useMemo(() => {
+    const baseHumans =
+      humanMembers && humanMembers.length > 0 ? humanMembers : DEFAULT_TEAM_HUMAN_MEMBERS
+    const custom = board.customMembers ?? []
+    return Array.from(
+      new Map([...baseHumans, ...configuredAgents, ...custom].map((m) => [m.id, m])).values()
+    )
+  }, [humanMembers, configuredAgents, board.customMembers])
+
+  const filters = useKanbanBoardFilters({
+    columns: board.columns,
+    cardMap,
+    currentUserId,
+    currentUserName,
+    pendingApprovalCardIds,
+    members: allBoardMembers
+  })
 
   const handleOpenExecutionModal = useCallback(
     (cardId: string | null) => {
@@ -247,28 +279,41 @@ export function TeamKanbanBoardView({
     ? (factory.factoryRunsByCard.get(factoryModalCardId) ?? null)
     : null
 
+  const externalEditingCard = selectedCardId ? (cardMap[selectedCardId] ?? null) : null
+  const effectiveIsModalOpen = isModalOpen || Boolean(externalEditingCard)
+  const effectiveEditingCard = isModalOpen ? activeEditingCard : externalEditingCard
+  const effectiveTargetColumnId = isModalOpen ? targetColumnId : externalEditingCard?.columnId
+
   const handleOpenNewCard = useCallback(
     (colId?: string) => {
       if (!canEditBoard) {
         return
       }
+      onSelectedCardIdChange?.(null)
       setEditingCard(null)
       setTargetColumnId(colId ?? board.columns[0]?.id)
       setIsModalOpen(true)
       onActiveCardChange?.(undefined)
     },
-    [board.columns, canEditBoard, onActiveCardChange]
+    [board.columns, canEditBoard, onActiveCardChange, onSelectedCardIdChange]
   )
 
   const handleEditCard = useCallback(
     (card: TeamKanbanCard) => {
+      onSelectedCardIdChange?.(null)
       setEditingCard(card)
       setTargetColumnId(card.columnId)
       setIsModalOpen(true)
       onActiveCardChange?.(card.id)
     },
-    [onActiveCardChange]
+    [onActiveCardChange, onSelectedCardIdChange]
   )
+
+  const handleCloseCardModal = useCallback(() => {
+    setIsModalOpen(false)
+    onSelectedCardIdChange?.(null)
+    onActiveCardChange?.(undefined)
+  }, [onActiveCardChange, onSelectedCardIdChange])
 
   const handleAddColumn = useCallback(
     (title: string): void => {
@@ -379,17 +424,17 @@ export function TeamKanbanBoardView({
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-background">
       <TeamKanbanToolbar
-        searchQuery={filters.searchQuery}
-        selectedPriority={filters.selectedPriority}
-        selectedFilterMember={filters.selectedFilterMember}
+        filters={filters.filters}
         statusFilter={filters.statusFilter}
+        myPendingCount={filters.myPendingCount}
+        availableLabels={filters.availableLabels}
+        assigneeOptions={filters.assigneeOptions}
         filteredCount={filters.filteredCards.length}
         filteredPoints={filters.filteredPoints}
         activeFactoryCount={factory.activeRunCount}
         waitingHumanCount={factory.waitingHumanCount}
         canCreateTask={canEditBoard}
-        onSearchChange={filters.setSearchQuery}
-        onPriorityChange={filters.setSelectedPriority}
+        onFiltersChange={filters.setFilters}
         onStatusFilterChange={filters.setStatusFilter}
         onClearFilters={filters.handleClearFilters}
         onOpenFactoryConfig={() => setIsFactoryConfigOpen(true)}
@@ -456,10 +501,10 @@ export function TeamKanbanBoardView({
       </DndContext>
 
       <TeamKanbanCardModal
-        isOpen={isModalOpen}
-        card={activeEditingCard}
+        isOpen={effectiveIsModalOpen}
+        card={effectiveEditingCard}
         columns={board.columns}
-        defaultColumnId={targetColumnId}
+        defaultColumnId={effectiveTargetColumnId}
         projectId={resolvedProjectId}
         currentUserId={currentUserId}
         currentUserName={currentUserName ?? 'Equipo Local'}
@@ -469,10 +514,7 @@ export function TeamKanbanBoardView({
         readOnly={isReadOnly}
         canDispatchAgents={canDispatchAgents}
         availableNotes={availableNotes}
-        onClose={() => {
-          setIsModalOpen(false)
-          onActiveCardChange?.(undefined)
-        }}
+        onClose={handleCloseCardModal}
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
         onDispatchAgent={actions.handleDispatchAgent}

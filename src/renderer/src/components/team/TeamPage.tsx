@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { Activity, Eye, FileText, Kanban, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import type {
+  TeamKanbanCard,
   TeamNote,
   TeamTab,
   TeamWhiteboardItem
@@ -20,6 +21,7 @@ import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnecte
 import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
 import { TeamCollaboratorsStrip } from './workspace/TeamCollaboratorsStrip'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
+import { TeamWorkspaceSearch } from './workspace/TeamWorkspaceSearch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
@@ -36,6 +38,8 @@ const EMPTY_NOTES: TeamNote[] = []
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
   const [activePeers, setActivePeers] = useState<CollaboratorPresence[]>([])
+  const [focusedCardId, setFocusedCardId] = useState<string | null>(null)
+  const [focusedNoteId, setFocusedNoteId] = useState<string | undefined>(undefined)
   const activeWorktree = useActiveWorktree()
   const activeRepo = useActiveRepo()
   const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
@@ -110,6 +114,34 @@ export default function TeamPage(): React.JSX.Element {
       email: syncAndAuth.user.email
     }
   })
+
+  const handleSelectTeam = useCallback(
+    (teamId: string) => {
+      setFocusedCardId(null)
+      setFocusedNoteId(undefined)
+      registry.setActiveTeamId(teamId)
+    },
+    [registry]
+  )
+
+  const handleSelectProject = useCallback(
+    (projectId: string) => {
+      setFocusedCardId(null)
+      setFocusedNoteId(undefined)
+      registry.setActiveProjectId(projectId)
+    },
+    [registry]
+  )
+
+  const handleJumpToCard = useCallback((card: TeamKanbanCard) => {
+    setFocusedCardId(card.id)
+    setActiveTab('kanban')
+  }, [])
+
+  const handleJumpToNote = useCallback((note: TeamNote) => {
+    setFocusedNoteId(note.id)
+    setActiveTab('notes')
+  }, [])
 
   const handleInviteMember = useCallback(
     async (email: string, role: TeamRole) => {
@@ -199,8 +231,8 @@ export default function TeamPage(): React.JSX.Element {
         projectMembersByProject={registry.projectMembersByProject}
         currentUser={syncAndAuth.user}
         syncStatus={syncAndAuth.syncStatus}
-        onSelectTeam={registry.setActiveTeamId}
-        onSelectProject={registry.setActiveProjectId}
+        onSelectTeam={handleSelectTeam}
+        onSelectProject={handleSelectProject}
         onCreateTeam={registry.handleCreateTeam}
         onCreateProject={registry.handleCreateProject}
         onInviteMember={handleInviteMember}
@@ -254,6 +286,12 @@ export default function TeamPage(): React.JSX.Element {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <TeamWorkspaceSearch
+            board={board}
+            notes={notes}
+            onSelectCard={handleJumpToCard}
+            onSelectNote={handleJumpToNote}
+          />
           {permissions.isReadOnly ? (
             <Badge
               variant="outline"
@@ -326,6 +364,8 @@ export default function TeamPage(): React.JSX.Element {
             availableNotes={notes?.notes ?? EMPTY_NOTES}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
+            selectedCardId={focusedCardId}
+            onSelectedCardIdChange={setFocusedCardId}
             onPersist={handleBoardChange}
             onPeersChange={setActivePeers}
           />
@@ -355,6 +395,8 @@ export default function TeamPage(): React.JSX.Element {
             permissions={permissions}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
+            selectedNoteId={focusedNoteId}
+            onSelectNoteId={(noteId) => setFocusedNoteId(noteId ?? undefined)}
             onPersist={handleNotesChange}
             onPeersChange={setActivePeers}
             onExtractTasksToKanban={handleExtractTasksToKanban}

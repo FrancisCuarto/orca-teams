@@ -30,6 +30,8 @@ type Props = {
   availableNotes?: TeamNote[]
   relayUrl?: string | null
   syncToken?: string
+  selectedCardId?: string | null
+  onSelectedCardIdChange?: (cardId: string | null) => void
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
   onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
@@ -45,6 +47,8 @@ export function TeamKanbanConnectedView({
   availableNotes,
   relayUrl,
   syncToken,
+  selectedCardId,
+  onSelectedCardIdChange,
   onPersist,
   onPeersChange
 }: Props): React.JSX.Element {
@@ -98,6 +102,8 @@ export function TeamKanbanConnectedView({
         humanMembers={humanMembers}
         peers={peers}
         availableNotes={availableNotes}
+        selectedCardId={selectedCardId}
+        onSelectedCardIdChange={onSelectedCardIdChange}
         onActiveCardChange={updateActiveCard}
         onAddCardComment={addCardComment}
         onDeleteCardComment={deleteCardComment}
