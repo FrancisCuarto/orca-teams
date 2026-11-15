@@ -93,4 +93,34 @@ describe('TeamAgentExecutionModal', () => {
     fireEvent.click(cancelBtn)
     expect(onCancel).toHaveBeenCalledWith('exec-test-1')
   })
+
+  it('muestra la puerta de aprobación humana y dispara onApprove / onReject cuando waiting_for_input', () => {
+    const execution: AgentExecutionRecord = {
+      ...createSampleExecution('waiting_for_input'),
+      worktreePath: '/tmp/repo/.orca/team-worktrees/card-1',
+      baseBranch: 'main',
+      approvalStatus: 'pending',
+      changedFiles: ['M src/App.tsx']
+    }
+    const onApprove = vi.fn()
+    const onReject = vi.fn()
+
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Aprobar PR"
+        execution={execution}
+        onOpenChange={vi.fn()}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+    )
+
+    expect(screen.getByText('M src/App.tsx')).toBeDefined()
+    fireEvent.click(screen.getByText('Aprobar y Fusionar a main'))
+    expect(onApprove).toHaveBeenCalledWith('exec-test-1', true)
+
+    fireEvent.click(screen.getByText('Rechazar y Descartar Worktree'))
+    expect(onReject).toHaveBeenCalledWith('exec-test-1', true)
+  })
 })

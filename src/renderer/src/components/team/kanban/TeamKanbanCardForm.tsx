@@ -65,6 +65,8 @@ export function TeamKanbanCardForm({
   const [checklist, setChecklist] = useState(card?.checklist ? [...card.checklist] : [])
   const [estimatePoints, setEstimatePoints] = useState<number | undefined>(card?.estimatePoints)
   const [branchOrWorktree, setBranchOrWorktree] = useState(card?.branchOrWorktree ?? '')
+  const [isolateWorktree, setIsolateWorktree] = useState(card?.isolateWorktree ?? true)
+  const [requiresApproval, setRequiresApproval] = useState(card?.requiresApproval ?? false)
   const [blockedReason, setBlockedReason] = useState(card?.blockedReason ?? '')
 
   const agents = useMemo(
@@ -141,6 +143,8 @@ export function TeamKanbanCardForm({
       checklist,
       estimatePoints,
       branchOrWorktree,
+      isolateWorktree,
+      requiresApproval,
       blockedReason
     })
     onSave(updatedCard)
@@ -201,6 +205,8 @@ export function TeamKanbanCardForm({
           priority={priority}
           estimatePoints={estimatePoints}
           branchOrWorktree={branchOrWorktree}
+          isolateWorktree={isolateWorktree}
+          requiresApproval={requiresApproval}
           blockedReason={blockedReason}
           labelsText={labelsText}
           description={description}
@@ -208,6 +214,8 @@ export function TeamKanbanCardForm({
           onPriorityChange={setPriority}
           onEstimatePointsChange={setEstimatePoints}
           onBranchChange={setBranchOrWorktree}
+          onIsolateWorktreeChange={setIsolateWorktree}
+          onRequiresApprovalChange={setRequiresApproval}
           onBlockedReasonChange={setBlockedReason}
           onLabelsTextChange={setLabelsText}
           onDescriptionChange={setDescription}

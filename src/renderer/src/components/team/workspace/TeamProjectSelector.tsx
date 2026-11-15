@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronDown, FolderGit2, Globe, Lock, Plus, Users } from 'lucide-react'
+import { ChevronDown, FolderGit2, Globe, Lock, Plus, Users, Wifi } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -13,17 +13,21 @@ import type {
   Project,
   Team,
   TeamInvitation,
-  TeamRole
+  TeamRole,
+  TeamSyncSettings,
+  TeamUserProfile
 } from '../../../../../shared/teamwork/team-workspace-types'
 import type {
   TeamMailConfigInput,
   TeamMailConfigPublic,
   TeamMemberWithProfile,
-  TeamSendInvitationResult
+  TeamSendInvitationResult,
+  TeamSyncRuntimeStatus
 } from '../../../../../shared/teamwork/team-ipc-types'
 import { TeamCreateModal } from './TeamCreateModal'
 import { ProjectCreateModal } from './ProjectCreateModal'
 import { TeamMembersModal } from './TeamMembersModal'
+import { TeamSyncAccountModal } from './TeamSyncAccountModal'
 
 type Props = {
   teams: Team[]
@@ -34,6 +38,8 @@ type Props = {
   pendingInvitations: TeamInvitation[]
   mailConfig: TeamMailConfigPublic | null
   userRole: TeamRole
+  currentUser?: TeamUserProfile
+  syncStatus?: TeamSyncRuntimeStatus
   onSelectTeam: (teamId: string) => void
   onSelectProject: (projectId: string) => void
   onCreateTeam: (team: Omit<Team, 'createdAt' | 'updatedAt'>) => void
@@ -44,6 +50,17 @@ type Props = {
   onAcceptInvitation: (token: string, displayName?: string, email?: string) => Promise<unknown>
   onSaveMailConfig: (input: TeamMailConfigInput) => Promise<TeamMailConfigPublic>
   onTestMailConfig: (toEmail: string) => Promise<{ ok: boolean; error?: string }>
+  onUpdateProfile?: (input: { displayName: string; email: string }) => Promise<TeamUserProfile>
+  onRequestMagicCode?: (
+    email: string,
+    displayName?: string
+  ) => Promise<{ sent: boolean; expiresAt: number; devCode?: string; error?: string }>
+  onVerifyMagicCode?: (
+    email: string,
+    code: string,
+    displayName?: string
+  ) => Promise<TeamUserProfile>
+  onConfigureSync?: (settings: Partial<TeamSyncSettings>) => Promise<TeamSyncRuntimeStatus>
 }
 
 export function TeamProjectSelector({
@@ -55,6 +72,8 @@ export function TeamProjectSelector({
   pendingInvitations,
   mailConfig,
   userRole,
+  currentUser,
+  syncStatus,
   onSelectTeam,
   onSelectProject,
   onCreateTeam,
@@ -64,11 +83,16 @@ export function TeamProjectSelector({
   onRevokeInvitation,
   onAcceptInvitation,
   onSaveMailConfig,
-  onTestMailConfig
+  onTestMailConfig,
+  onUpdateProfile,
+  onRequestMagicCode,
+  onVerifyMagicCode,
+  onConfigureSync
 }: Props): React.JSX.Element {
   const [teamModalOpen, setTeamModalOpen] = useState(false)
   const [projectModalOpen, setProjectModalOpen] = useState(false)
   const [membersModalOpen, setMembersModalOpen] = useState(false)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
 
   return (
     <div className="flex items-center gap-2 border-b border-border bg-card/40 px-4 py-2">
@@ -163,6 +187,21 @@ export function TeamProjectSelector({
       </DropdownMenu>
 
       <div className="ml-auto flex items-center gap-2">
+        {currentUser && syncStatus && (
+          <Button variant="outline" size="xs" onClick={() => setSyncModalOpen(true)}>
+            <Wifi
+              className={
+                syncStatus.hostingActive || syncStatus.settings.mode === 'remote'
+                  ? 'w-3.5 h-3.5 text-workspace-status-review'
+                  : 'w-3.5 h-3.5 text-muted-foreground'
+              }
+            />
+            <span className="truncate max-w-[110px]">{currentUser.displayName}</span>
+            <Badge variant="secondary">
+              <span className="uppercase">{syncStatus.settings.mode}</span>
+            </Badge>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -206,6 +245,24 @@ export function TeamProjectSelector({
         onSaveMailConfig={onSaveMailConfig}
         onTestMailConfig={onTestMailConfig}
       />
+
+      {currentUser &&
+        syncStatus &&
+        onUpdateProfile &&
+        onRequestMagicCode &&
+        onVerifyMagicCode &&
+        onConfigureSync && (
+          <TeamSyncAccountModal
+            open={syncModalOpen}
+            user={currentUser}
+            syncStatus={syncStatus}
+            onOpenChange={setSyncModalOpen}
+            onUpdateProfile={onUpdateProfile}
+            onRequestMagicCode={onRequestMagicCode}
+            onVerifyMagicCode={onVerifyMagicCode}
+            onConfigureSync={onConfigureSync}
+          />
+        )}
     </div>
   )
 }

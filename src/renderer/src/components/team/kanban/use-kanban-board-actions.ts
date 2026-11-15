@@ -64,7 +64,9 @@ export function useKanbanBoardActions(options: Options) {
           projectId,
           projectPath,
           actorUserId,
-          sprintGoal: board.sprintGoal
+          sprintGoal: board.sprintGoal,
+          isolateWorktree: resolvedCard.isolateWorktree,
+          requiresApproval: resolvedCard.requiresApproval
         })
         if (record) {
           onOpenExecutionModal(resolvedCard.id)

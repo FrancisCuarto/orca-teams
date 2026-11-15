@@ -1,9 +1,70 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type {
+  AgentApprovalStatus,
   AgentExecutionLog,
   AgentExecutionRecord,
   AgentExecutionStatus
 } from './team-workspace-types'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isExecutionStatus(value: unknown): value is AgentExecutionStatus {
+  return (
+    value === 'queued' ||
+    value === 'running' ||
+    value === 'waiting_for_input' ||
+    value === 'completed' ||
+    value === 'failed' ||
+    value === 'cancelled'
+  )
+}
+
+function isApprovalStatus(value: unknown): value is AgentApprovalStatus {
+  return value === 'pending' || value === 'approved' || value === 'rejected'
+}
+
+function parseExecutionLogs(raw: unknown): AgentExecutionLog[] {
+  if (typeof raw !== 'string') {
+    return []
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+    const result: AgentExecutionLog[] = []
+    for (const item of parsed) {
+      if (
+        isRecord(item) &&
+        typeof item.timestamp === 'number' &&
+        (item.level === 'info' || item.level === 'warn' || item.level === 'error') &&
+        typeof item.message === 'string'
+      ) {
+        result.push({ timestamp: item.timestamp, level: item.level, message: item.message })
+      }
+    }
+    return result
+  } catch {
+    return []
+  }
+}
+
+function parseChangedFiles(raw: unknown): string[] | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return undefined
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      return undefined
+    }
+    return parsed.filter((item): item is string => typeof item === 'string')
+  } catch {
+    return undefined
+  }
+}
 
 export class TeamExecutionService {
   constructor(private readonly db: DatabaseSync) {}
@@ -12,17 +73,18 @@ export class TeamExecutionService {
     const existingQuery = this.db.prepare(
       `SELECT * FROM agent_executions WHERE idempotency_key = ?`
     )
-    const existing = existingQuery.get(record.idempotencyKey) as Record<string, unknown> | undefined
-    if (existing) {
+    const existing = existingQuery.get(record.idempotencyKey)
+    if (isRecord(existing)) {
       return this.mapExecutionRow(existing)
     }
 
     const stmt = this.db.prepare(
       `INSERT INTO agent_executions (
         id, task_id, project_id, agent_id, agent_type, model, status,
-        prompt, branch_or_worktree, output_summary, idempotency_key, logs_json,
+        prompt, branch_or_worktree, worktree_path, base_branch, approval_status,
+        changed_files_json, output_summary, idempotency_key, logs_json,
         started_at, completed_at, error, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
     stmt.run(
@@ -35,6 +97,10 @@ export class TeamExecutionService {
       record.status,
       record.prompt,
       record.branchOrWorktree ?? null,
+      record.worktreePath ?? null,
+      record.baseBranch ?? null,
+      record.approvalStatus ?? null,
+      record.changedFiles ? JSON.stringify(record.changedFiles) : null,
       record.outputSummary ?? null,
       record.idempotencyKey,
       JSON.stringify(record.logs),
@@ -50,8 +116,8 @@ export class TeamExecutionService {
 
   getAgentExecution(executionId: string): AgentExecutionRecord | null {
     const query = this.db.prepare(`SELECT * FROM agent_executions WHERE id = ?`)
-    const row = query.get(executionId) as Record<string, unknown> | undefined
-    if (!row) {
+    const row = query.get(executionId)
+    if (!isRecord(row)) {
       return null
     }
     return this.mapExecutionRow(row)
@@ -61,8 +127,8 @@ export class TeamExecutionService {
     const query = this.db.prepare(
       `SELECT * FROM agent_executions WHERE task_id = ? ORDER BY created_at DESC LIMIT 1`
     )
-    const row = query.get(taskId) as Record<string, unknown> | undefined
-    if (!row) {
+    const row = query.get(taskId)
+    if (!isRecord(row)) {
       return null
     }
     return this.mapExecutionRow(row)
@@ -73,6 +139,8 @@ export class TeamExecutionService {
     status: AgentExecutionStatus
     outputSummary?: string
     error?: string
+    approvalStatus?: AgentApprovalStatus
+    changedFiles?: string[]
   }): void {
     const now = Date.now()
     const isTerminal =
@@ -83,8 +151,12 @@ export class TeamExecutionService {
 
     const stmt = this.db.prepare(
       `UPDATE agent_executions
-       SET status = ?, output_summary = COALESCE(?, output_summary),
-           error = COALESCE(?, error), completed_at = COALESCE(?, completed_at),
+       SET status = ?,
+           output_summary = COALESCE(?, output_summary),
+           error = COALESCE(?, error),
+           approval_status = COALESCE(?, approval_status),
+           changed_files_json = COALESCE(?, changed_files_json),
+           completed_at = COALESCE(?, completed_at),
            updated_at = ?
        WHERE id = ?`
     )
@@ -92,6 +164,8 @@ export class TeamExecutionService {
       options.status,
       options.outputSummary ?? null,
       options.error ?? null,
+      options.approvalStatus ?? null,
+      options.changedFiles ? JSON.stringify(options.changedFiles) : null,
       completedAt,
       now,
       options.executionId
@@ -112,15 +186,6 @@ export class TeamExecutionService {
   }
 
   private mapExecutionRow(row: Record<string, unknown>): AgentExecutionRecord {
-    let logs: AgentExecutionLog[] = []
-    if (typeof row.logs_json === 'string') {
-      try {
-        logs = JSON.parse(row.logs_json) as AgentExecutionLog[]
-      } catch {
-        logs = []
-      }
-    }
-
     return {
       id: String(row.id),
       taskId: String(row.task_id),
@@ -128,12 +193,16 @@ export class TeamExecutionService {
       agentId: String(row.agent_id),
       agentType: String(row.agent_type),
       model: String(row.model),
-      status: String(row.status) as AgentExecutionStatus,
+      status: isExecutionStatus(row.status) ? row.status : 'failed',
       prompt: String(row.prompt),
       branchOrWorktree: row.branch_or_worktree ? String(row.branch_or_worktree) : undefined,
+      worktreePath: row.worktree_path ? String(row.worktree_path) : undefined,
+      baseBranch: row.base_branch ? String(row.base_branch) : undefined,
+      approvalStatus: isApprovalStatus(row.approval_status) ? row.approval_status : undefined,
+      changedFiles: parseChangedFiles(row.changed_files_json),
       outputSummary: row.output_summary ? String(row.output_summary) : undefined,
       idempotencyKey: String(row.idempotency_key),
-      logs,
+      logs: parseExecutionLogs(row.logs_json),
       startedAt: row.started_at ? Number(row.started_at) : undefined,
       completedAt: row.completed_at ? Number(row.completed_at) : undefined,
       error: row.error ? String(row.error) : undefined,

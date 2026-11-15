@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react'
-import { FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
+import { Activity, FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
 import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
@@ -7,13 +7,15 @@ import {
   computeBoardSprintMetrics,
   extractActionItemsFromMarkdownToBoard
 } from './kanban/team-kanban-board-mutations'
-import { TeamKanbanBoardView } from './kanban/TeamKanbanBoardView'
+import { TeamActivityView } from './activity/TeamActivityView'
+import { TeamKanbanConnectedView } from './kanban/TeamKanbanConnectedView'
 import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
 import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
+import { useTeamSyncAndAuth } from './hooks/use-team-sync-and-auth'
 import { useTeamWorkspaceData } from './hooks/use-team-workspace-data'
 import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
 
@@ -23,6 +25,7 @@ export default function TeamPage(): React.JSX.Element {
   const activeRepo = useActiveRepo()
   const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
 
+  const syncAndAuth = useTeamSyncAndAuth()
   const registry = useTeamWorkspaceRegistry({
     activeWorktreeId: activeWorktree?.id,
     activeWorktreePath: activeWorktree?.path,
@@ -30,6 +33,8 @@ export default function TeamPage(): React.JSX.Element {
     activeRepoPath: activeRepo?.path,
     activeRepoDisplayName: activeRepo?.displayName
   })
+
+  const activeProjectId = registry.currentProject?.id ?? 'proj-default'
 
   const {
     board,
@@ -41,12 +46,21 @@ export default function TeamPage(): React.JSX.Element {
     handleWhiteboardChange,
     handleNotesChange
   } = useTeamWorkspaceData({
-    projectId: registry.currentProject?.id ?? 'proj-default',
+    projectId: activeProjectId,
     projectPath,
     connectionId: activeRepo?.connectionId ?? undefined
   })
 
   const boardMetrics = useMemo(() => (board ? computeBoardSprintMetrics(board) : null), [board])
+
+  const currentUserIdentity = useMemo(
+    () => ({
+      userId: syncAndAuth.user.userId,
+      displayName: syncAndAuth.user.displayName,
+      avatarUrl: syncAndAuth.user.avatarUrl
+    }),
+    [syncAndAuth.user.userId, syncAndAuth.user.displayName, syncAndAuth.user.avatarUrl]
+  )
 
   const handleInviteMember = useCallback(
     async (email: string, role: TeamRole) => {
@@ -98,6 +112,8 @@ export default function TeamPage(): React.JSX.Element {
         pendingInvitations={registry.activePendingInvitations}
         mailConfig={registry.mailConfig}
         userRole={registry.userRole}
+        currentUser={syncAndAuth.user}
+        syncStatus={syncAndAuth.syncStatus}
         onSelectTeam={registry.setActiveTeamId}
         onSelectProject={registry.setActiveProjectId}
         onCreateTeam={registry.handleCreateTeam}
@@ -108,6 +124,10 @@ export default function TeamPage(): React.JSX.Element {
         onAcceptInvitation={registry.handleAcceptInvitation}
         onSaveMailConfig={registry.handleSaveMailConfig}
         onTestMailConfig={registry.handleTestMailConfig}
+        onUpdateProfile={syncAndAuth.updateProfile}
+        onRequestMagicCode={syncAndAuth.requestMagicCode}
+        onVerifyMagicCode={syncAndAuth.verifyMagicCode}
+        onConfigureSync={syncAndAuth.configureSync}
       />
 
       <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 border-b border-border bg-card/30">
@@ -136,6 +156,14 @@ export default function TeamPage(): React.JSX.Element {
             <FileText className="w-3.5 h-3.5" />
             Notas & ADRs
           </Button>
+          <Button
+            size="xs"
+            variant={activeTab === 'activity' ? 'secondary' : 'ghost'}
+            onClick={() => setActiveTab('activity')}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Actividad
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -163,40 +191,44 @@ export default function TeamPage(): React.JSX.Element {
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : activeTab === 'kanban' && board ? (
-          <TeamKanbanBoardView
-            key={registry.currentProject?.id}
-            board={board}
-            projectId={registry.currentProject?.id ?? 'proj-default'}
+          <TeamKanbanConnectedView
+            key={activeProjectId}
+            projectId={activeProjectId}
             projectPath={projectPath}
-            currentUserId={registry.currentUserId}
+            initialBoard={board}
+            currentUser={{ ...currentUserIdentity, color: '#3b82f6' }}
             humanMembers={registry.humanMembers}
-            onChange={handleBoardChange}
+            relayUrl={syncAndAuth.effectiveRelayUrl}
+            syncToken={syncAndAuth.syncToken}
+            onPersist={handleBoardChange}
           />
         ) : activeTab === 'whiteboard' && whiteboard ? (
           <TeamWhiteboardConnectedView
-            key={registry.currentProject?.id}
-            whiteboardId={registry.currentProject?.id ?? 'wb-default'}
-            projectId={registry.currentProject?.id ?? 'proj-default'}
+            key={activeProjectId}
+            whiteboardId={activeProjectId}
+            projectId={activeProjectId}
             initialWhiteboard={whiteboard}
-            currentUser={{
-              userId: registry.currentUserId,
-              displayName: registry.activeMembers[0]?.displayName ?? 'Francis (Lead)',
-              color: '#10b981'
-            }}
+            currentUser={{ ...currentUserIdentity, color: '#10b981' }}
+            relayUrl={syncAndAuth.effectiveRelayUrl}
+            syncToken={syncAndAuth.syncToken}
             onPersist={handleWhiteboardChange}
           />
         ) : activeTab === 'notes' && notes ? (
           <TeamNotesConnectedView
-            key={registry.currentProject?.id}
-            projectId={registry.currentProject?.id ?? 'proj-default'}
+            key={activeProjectId}
+            projectId={activeProjectId}
             initialNotes={notes}
-            currentUser={{
-              userId: registry.currentUserId,
-              displayName: registry.activeMembers[0]?.displayName ?? 'Francis (Lead)',
-              color: '#8b5cf6'
-            }}
+            currentUser={{ ...currentUserIdentity, color: '#8b5cf6' }}
+            relayUrl={syncAndAuth.effectiveRelayUrl}
+            syncToken={syncAndAuth.syncToken}
             onPersist={handleNotesChange}
             onExtractTasksToKanban={handleExtractTasksToKanban}
+          />
+        ) : activeTab === 'activity' ? (
+          <TeamActivityView
+            key={activeProjectId}
+            teamId={registry.activeTeam?.id ?? 'team-local'}
+            projectId={activeProjectId}
           />
         ) : null}
       </main>

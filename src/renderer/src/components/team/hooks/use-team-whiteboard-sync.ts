@@ -5,6 +5,7 @@ import type {
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { TeamWhiteboardCRDT } from '../../../../../shared/teamwork/realtime/team-crdt-whiteboard'
 import { TeamRoomProvider } from '../../../../../shared/teamwork/realtime/team-room-provider'
+import { TeamWebSocketTransport } from '../../../../../shared/teamwork/realtime/team-ws-transport'
 import type { SyncStatus } from './use-team-kanban-sync'
 import type { WhiteboardCursorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 
@@ -17,6 +18,8 @@ export type UseTeamWhiteboardSyncOptions = {
     avatarUrl?: string
     color?: string
   }
+  relayUrl?: string | null
+  syncToken?: string
   initialWhiteboard?: TeamWhiteboard | null
   onPersist?: (whiteboard: TeamWhiteboard) => void
 }
@@ -30,6 +33,7 @@ export type UseTeamWhiteboardSyncReturn = {
   updateItemContent: (itemId: string, content: string) => void
   deleteItem: (itemId: string) => void
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void
+  syncWhiteboard: (whiteboard: TeamWhiteboard) => void
   broadcastCursor: (x: number, y: number) => void
 }
 
@@ -39,6 +43,8 @@ export function useTeamWhiteboardSync({
   whiteboardId,
   projectId,
   currentUser,
+  relayUrl,
+  syncToken,
   initialWhiteboard,
   onPersist
 }: UseTeamWhiteboardSyncOptions): UseTeamWhiteboardSyncReturn {
@@ -49,25 +55,36 @@ export function useTeamWhiteboardSync({
   const crdtRef = useRef<TeamWhiteboardCRDT | null>(null)
   const roomProviderRef = useRef<TeamRoomProvider | null>(null)
   const lastCursorBroadcastRef = useRef<number>(0)
+  const initialWhiteboardRef = useRef(initialWhiteboard)
+  initialWhiteboardRef.current = initialWhiteboard
   const onPersistRef = useRef(onPersist)
   onPersistRef.current = onPersist
 
   useEffect(() => {
     const roomId = `project:${projectId}:whiteboard:${whiteboardId}`
     const crdt = new TeamWhiteboardCRDT(whiteboardId)
-    // TeamRoomProvider espera ITeamBoardCRDT pero solo requiere encodeStateAsUpdate y applyUpdate
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const room = new TeamRoomProvider(roomId, crdt as any, currentUser.userId)
+    const transport = relayUrl?.trim()
+      ? new TeamWebSocketTransport({
+          url: relayUrl.trim(),
+          roomId,
+          userId: currentUser.userId,
+          token: syncToken
+        })
+      : undefined
+    const room = new TeamRoomProvider(roomId, crdt, currentUser.userId, transport)
 
     crdtRef.current = crdt
     roomProviderRef.current = room
 
-    if (initialWhiteboard) {
-      crdt.initializeFromWhiteboard(initialWhiteboard)
+    if (initialWhiteboardRef.current) {
+      crdt.initializeFromWhiteboard(initialWhiteboardRef.current)
     }
 
     setWhiteboard(crdt.getWhiteboard())
-    setSyncStatus('connected')
+
+    const unsubscribeStatus = room.onStatusChange((nextStatus) => {
+      setSyncStatus(nextStatus)
+    })
 
     room.updatePresence({
       userId: currentUser.userId,
@@ -103,6 +120,7 @@ export function useTeamWhiteboardSync({
 
     return () => {
       clearInterval(presenceInterval)
+      unsubscribeStatus()
       unsubscribeBoard()
       unsubscribePresence()
       room.destroy()
@@ -113,41 +131,36 @@ export function useTeamWhiteboardSync({
   }, [
     whiteboardId,
     projectId,
+    relayUrl,
+    syncToken,
     currentUser.userId,
     currentUser.displayName,
     currentUser.avatarUrl,
-    currentUser.color,
-    initialWhiteboard
+    currentUser.color
   ])
 
   const upsertItem = useCallback((item: TeamWhiteboardItem) => {
-    if (crdtRef.current) {
-      crdtRef.current.upsertItem(item)
-    }
+    crdtRef.current?.upsertItem(item)
   }, [])
 
   const moveItem = useCallback((itemId: string, x: number, y: number) => {
-    if (crdtRef.current) {
-      crdtRef.current.moveItem(itemId, x, y)
-    }
+    crdtRef.current?.moveItem(itemId, x, y)
   }, [])
 
   const updateItemContent = useCallback((itemId: string, content: string) => {
-    if (crdtRef.current) {
-      crdtRef.current.updateItemContent(itemId, content)
-    }
+    crdtRef.current?.updateItemContent(itemId, content)
   }, [])
 
   const deleteItem = useCallback((itemId: string) => {
-    if (crdtRef.current) {
-      crdtRef.current.deleteItem(itemId)
-    }
+    crdtRef.current?.deleteItem(itemId)
   }, [])
 
   const setViewport = useCallback((viewport: { x: number; y: number; zoom: number }) => {
-    if (crdtRef.current) {
-      crdtRef.current.setViewport(viewport)
-    }
+    crdtRef.current?.setViewport(viewport)
+  }, [])
+
+  const syncWhiteboard = useCallback((nextWhiteboard: TeamWhiteboard) => {
+    crdtRef.current?.syncFromWhiteboard(nextWhiteboard)
   }, [])
 
   const broadcastCursor = useCallback(
@@ -158,15 +171,13 @@ export function useTeamWhiteboardSync({
       }
       lastCursorBroadcastRef.current = now
 
-      if (roomProviderRef.current) {
-        roomProviderRef.current.updatePresence({
-          userId: currentUser.userId,
-          displayName: currentUser.displayName,
-          avatarUrl: currentUser.avatarUrl,
-          color: currentUser.color ?? '#10b981',
-          cursor: { x, y }
-        })
-      }
+      roomProviderRef.current?.updatePresence({
+        userId: currentUser.userId,
+        displayName: currentUser.displayName,
+        avatarUrl: currentUser.avatarUrl,
+        color: currentUser.color ?? '#10b981',
+        cursor: { x, y }
+      })
     },
     [currentUser.userId, currentUser.displayName, currentUser.avatarUrl, currentUser.color]
   )
@@ -180,6 +191,7 @@ export function useTeamWhiteboardSync({
     updateItemContent,
     deleteItem,
     setViewport,
+    syncWhiteboard,
     broadcastCursor
   }
 }

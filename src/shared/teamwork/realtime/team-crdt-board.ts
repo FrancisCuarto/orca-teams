@@ -156,6 +156,37 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
     })
   }
 
+  syncFromBoard(board: TeamKanbanBoard): void {
+    this.doc.transact(() => {
+      this.metadataMap.set('title', board.title)
+      if (board.description !== undefined) {
+        this.metadataMap.set('description', board.description)
+      }
+      if (board.projectId !== undefined) {
+        this.metadataMap.set('projectId', board.projectId)
+      }
+      if (board.sprintGoal !== undefined) {
+        this.metadataMap.set('sprintGoal', board.sprintGoal)
+      }
+      this.metadataMap.set('updatedAt', board.updatedAt || Date.now())
+
+      const nextCardIds = new Set(Object.keys(board.cards))
+      for (const existingId of Array.from(this.cardsMap.keys())) {
+        if (!nextCardIds.has(existingId)) {
+          this.cardsMap.delete(existingId)
+        }
+      }
+      for (const [cardId, card] of Object.entries(board.cards)) {
+        const current = this.cardsMap.get(cardId)
+        if (!current || JSON.stringify(current) !== JSON.stringify(card)) {
+          this.cardsMap.set(cardId, card)
+        }
+      }
+
+      this.replaceColumns(board.columns)
+    })
+  }
+
   subscribe(callback: (board: TeamKanbanBoard) => void): () => void {
     this.changeListeners.add(callback)
     return () => {

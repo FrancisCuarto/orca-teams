@@ -8,22 +8,26 @@ import {
   type Project,
   type ProjectVisibility,
   type Team,
+  type TeamActivityEntry,
   type TeamInvitation,
   type TeamMember,
   type TeamRole
 } from './team-workspace-types'
 import { teamSchemaStatements } from './team-schema'
+import { TeamActivityService } from './team-activity-service'
 import { TeamExecutionService } from './team-execution-service'
 import { TeamInvitationService } from './team-invitation-service'
 import { TeamProjectService } from './team-project-service'
 import { mapTeamRow } from './team-row-mappers'
 
 export class TeamDatabaseService {
+  private readonly activity: TeamActivityService
   private readonly executions: TeamExecutionService
   private readonly invitations: TeamInvitationService
   private readonly projects: TeamProjectService
 
   constructor(private readonly db: DatabaseSync) {
+    this.activity = new TeamActivityService(db)
     this.executions = new TeamExecutionService(db)
     this.invitations = new TeamInvitationService(db, (t, u) => this.getTeamMemberRole(t, u))
     this.projects = new TeamProjectService(db, (t, u) => this.getTeamMemberRole(t, u))
@@ -33,6 +37,33 @@ export class TeamDatabaseService {
     const statements = teamSchemaStatements()
     for (const sql of statements) {
       this.db.exec(sql)
+    }
+    this.ensureExecutionColumns()
+  }
+
+  private ensureExecutionColumns(): void {
+    const columns = this.db.prepare('PRAGMA table_info(agent_executions)').all()
+    const existing = new Set<string>()
+    for (const col of columns) {
+      if (
+        typeof col === 'object' &&
+        col !== null &&
+        'name' in col &&
+        typeof col.name === 'string'
+      ) {
+        existing.add(col.name)
+      }
+    }
+    const additions: [string, string][] = [
+      ['worktree_path', 'TEXT'],
+      ['base_branch', 'TEXT'],
+      ['approval_status', 'TEXT'],
+      ['changed_files_json', 'TEXT']
+    ]
+    for (const [name, colType] of additions) {
+      if (!existing.has(name)) {
+        this.db.exec(`ALTER TABLE agent_executions ADD COLUMN ${name} ${colType}`)
+      }
     }
   }
 
@@ -223,5 +254,19 @@ export class TeamDatabaseService {
 
   appendAgentExecutionLog(executionId: string, log: AgentExecutionLog): void {
     this.executions.appendAgentExecutionLog(executionId, log)
+  }
+
+  // --- Historial / Auditoría (Activity) - Delegación a TeamActivityService ---
+
+  recordActivity(input: Omit<TeamActivityEntry, 'id' | 'createdAt'>): TeamActivityEntry {
+    return this.activity.recordActivity(input)
+  }
+
+  listActivity(options: {
+    teamId: string
+    projectId?: string
+    limit?: number
+  }): TeamActivityEntry[] {
+    return this.activity.listActivity(options)
   }
 }

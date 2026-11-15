@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, GitBranch } from 'lucide-react'
+import { AlertTriangle, GitBranch, ShieldCheck } from 'lucide-react'
 import {
   isTeamKanbanPriority,
   type TeamKanbanColumn,
@@ -18,6 +18,8 @@ type Props = {
   priority: TeamKanbanPriority
   estimatePoints: number | undefined
   branchOrWorktree: string
+  isolateWorktree: boolean
+  requiresApproval: boolean
   blockedReason: string
   labelsText: string
   description: string
@@ -25,6 +27,8 @@ type Props = {
   onPriorityChange: (value: TeamKanbanPriority) => void
   onEstimatePointsChange: (value: number | undefined) => void
   onBranchChange: (value: string) => void
+  onIsolateWorktreeChange: (value: boolean) => void
+  onRequiresApprovalChange: (value: boolean) => void
   onBlockedReasonChange: (value: string) => void
   onLabelsTextChange: (value: string) => void
   onDescriptionChange: (value: string) => void
@@ -36,6 +40,8 @@ export function TeamKanbanCardDetailsFields({
   priority,
   estimatePoints,
   branchOrWorktree,
+  isolateWorktree,
+  requiresApproval,
   blockedReason,
   labelsText,
   description,
@@ -43,6 +49,8 @@ export function TeamKanbanCardDetailsFields({
   onPriorityChange,
   onEstimatePointsChange,
   onBranchChange,
+  onIsolateWorktreeChange,
+  onRequiresApprovalChange,
   onBlockedReasonChange,
   onLabelsTextChange,
   onDescriptionChange
@@ -115,7 +123,7 @@ export function TeamKanbanCardDetailsFields({
           <Input
             value={branchOrWorktree}
             onChange={(e) => onBranchChange(e.target.value)}
-            placeholder="feat/nombre-de-rama"
+            placeholder="orca-team/auto-worktree"
             className="font-mono text-xs"
           />
         </div>
@@ -130,6 +138,30 @@ export function TeamKanbanCardDetailsFields({
             className="text-xs"
           />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-muted/20 px-3 py-2">
+        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isolateWorktree}
+            onChange={(e) => onIsolateWorktreeChange(e.target.checked)}
+            className="rounded border-input accent-primary"
+          />
+          <GitBranch className="size-3.5 text-primary" />
+          <span>Aislar agente en Git worktree dedicado</span>
+        </label>
+
+        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={requiresApproval}
+            onChange={(e) => onRequiresApprovalChange(e.target.checked)}
+            className="rounded border-input accent-primary"
+          />
+          <ShieldCheck className="size-3.5 text-workspace-status-review" />
+          <span>Requerir aprobación humana antes de integrar</span>
+        </label>
       </div>
 
       <div className="flex flex-col gap-1">

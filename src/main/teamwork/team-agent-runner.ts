@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import type { AgentExecutionRecord } from '../../shared/teamwork/team-workspace-types'
 import type {
+  TeamApproveExecutionRequest,
   TeamExecutionEvent,
+  TeamRejectExecutionRequest,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
 import { hydrateShellPathForAgentDetection } from '../ipc/command-path/agent-detection-shell-path'
@@ -14,12 +16,20 @@ import {
   extractCardAgentAssignment,
   resolveAgentCommand
 } from './team-agent-command'
+import { applyExecutionApproval, applyExecutionRejection } from './team-agent-approval'
 import {
   appendExecutionLog,
   cloneExecutionRecord,
   resolveWorkingDirectory,
   wireAgentChildProcess
 } from './team-agent-process-stream'
+import {
+  inspectWorktreeChanges,
+  provisionCardWorktree,
+  type discardCardWorktree,
+  type mergeWorktreeToBase,
+  type ProvisionedWorktree
+} from './team-worktree-provisioner'
 
 export { buildAgentCliCommand, buildKanbanAgentPrompt, resolveAgentCommand }
 
@@ -34,9 +44,19 @@ export type TeamAgentRunnerDeps = {
     options: { cwd: string; env: NodeJS.ProcessEnv }
   ) => ChildProcess
   getFallbackHomeDir?: () => string
+  provisionWorktree?: (options: {
+    projectPath?: string | null
+    cardId: string
+    cardTitle: string
+    preferredBranch?: string
+  }) => Promise<ProvisionedWorktree>
+  inspectWorktreeChanges?: (worktreePath: string) => Promise<string[]>
+  mergeWorktreeToBase?: typeof mergeWorktreeToBase
+  discardWorktree?: typeof discardCardWorktree
   onPersistExecution?: (record: AgentExecutionRecord) => void
   onLookupPersistedExecution?: (executionId: string) => AgentExecutionRecord | null
   onLookupLatestForCard?: (cardId: string) => AgentExecutionRecord | null
+  onNotifyOutcome?: (record: AgentExecutionRecord) => void
 }
 
 export class TeamAgentRunner {
@@ -57,6 +77,8 @@ export class TeamAgentRunner {
     const prompt = buildKanbanAgentPrompt(req)
     const now = Date.now()
     const executionId = `exec-${now}-${randomUUID().slice(0, 8)}`
+    const requiresApproval = req.requiresApproval ?? req.card.requiresApproval ?? false
+    const isolateWorktree = req.isolateWorktree ?? req.card.isolateWorktree ?? true
 
     const record: AgentExecutionRecord = {
       id: executionId,
@@ -98,12 +120,46 @@ export class TeamAgentRunner {
       record.updatedAt = record.completedAt
       appendExecutionLog(record, 'error', record.error)
       this.emitUpdated(record)
+      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
       return cloneExecutionRecord(record)
+    }
+
+    let workingDirInput = req.projectPath
+    if (isolateWorktree && req.projectPath?.trim()) {
+      const provisioner = this.deps.provisionWorktree ?? provisionCardWorktree
+      try {
+        const wt = await provisioner({
+          projectPath: req.projectPath,
+          cardId: req.card.id,
+          cardTitle: req.card.title,
+          preferredBranch: req.card.branchOrWorktree
+        })
+        if (wt.isGitRepo && wt.workDir) {
+          workingDirInput = wt.workDir
+          record.worktreePath = wt.workDir
+          record.branchOrWorktree = wt.branch ?? record.branchOrWorktree
+          record.baseBranch = wt.baseBranch
+          appendExecutionLog(
+            record,
+            'info',
+            wt.reused
+              ? `Reutilizando worktree aislado (${wt.branch ?? 'git'}) en ${wt.workDir}`
+              : `Worktree aislado creado (${wt.branch ?? 'git'}) en ${wt.workDir}`
+          )
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        appendExecutionLog(
+          record,
+          'warn',
+          `No se pudo crear worktree aislado (${msg}); ejecutando en workspace principal.`
+        )
+      }
     }
 
     const cli = buildAgentCliCommand(resolvedBin, prompt, model)
     const cwd = resolveWorkingDirectory(
-      req.projectPath,
+      workingDirInput,
       this.deps.getFallbackHomeDir ? this.deps.getFallbackHomeDir() : homedir()
     )
 
@@ -123,16 +179,22 @@ export class TeamAgentRunner {
           windowsHide: true
         }))
 
+    const inspectFn = this.deps.inspectWorktreeChanges ?? inspectWorktreeChanges
+
     try {
       const child = spawnFn(cli.bin, cli.args, { cwd, env: { ...process.env } })
       this.activeProcesses.set(executionId, child)
+      const worktreePath = record.worktreePath
       wireAgentChildProcess({
         executionId,
         record,
         child,
+        requiresApproval,
+        inspectChanges: worktreePath ? () => inspectFn(worktreePath) : undefined,
         isCancelled: () => this.cancelledIds.has(executionId),
         onFinishProcess: () => this.activeProcesses.delete(executionId),
-        onEmitUpdated: () => this.emitUpdated(record)
+        onEmitUpdated: () => this.emitUpdated(record),
+        onNotifyOutcome: () => this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -142,9 +204,52 @@ export class TeamAgentRunner {
       record.updatedAt = record.completedAt
       appendExecutionLog(record, 'error', record.error)
       this.emitUpdated(record)
+      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
     }
 
     return cloneExecutionRecord(record)
+  }
+
+  async approveExecution(
+    request: TeamApproveExecutionRequest
+  ): Promise<AgentExecutionRecord | null> {
+    const record = this.loadMutableExecution(request.executionId)
+    if (!record) {
+      return null
+    }
+    return applyExecutionApproval({
+      record,
+      request,
+      mergeWorktreeToBaseFn: this.deps.mergeWorktreeToBase,
+      onPersistAndEmit: (updated) => this.emitUpdated(updated)
+    })
+  }
+
+  async rejectExecution(request: TeamRejectExecutionRequest): Promise<AgentExecutionRecord | null> {
+    const record = this.loadMutableExecution(request.executionId)
+    if (!record) {
+      return null
+    }
+    return applyExecutionRejection({
+      record,
+      request,
+      discardWorktreeFn: this.deps.discardWorktree,
+      onPersistAndEmit: (updated) => this.emitUpdated(updated)
+    })
+  }
+
+  private loadMutableExecution(executionId: string): AgentExecutionRecord | null {
+    const mem = this.executions.get(executionId)
+    if (mem) {
+      return mem
+    }
+    const persisted = this.deps.onLookupPersistedExecution?.(executionId)
+    if (!persisted) {
+      return null
+    }
+    const cloned = cloneExecutionRecord(persisted)
+    this.executions.set(executionId, cloned)
+    return cloned
   }
 
   private emitUpdated(record: AgentExecutionRecord): void {

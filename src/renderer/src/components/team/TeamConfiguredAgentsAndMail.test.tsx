@@ -46,6 +46,8 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
       }
     }),
     cancelExecution: vi.fn(async () => null),
+    approveExecution: vi.fn(async () => null),
+    rejectExecution: vi.fn(async () => null),
     getExecution: vi.fn(async () => null),
     getLatestExecutionForCard: vi.fn(async () => null),
     onExecutionEvent: vi.fn(noopUnsub),
@@ -64,6 +66,14 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     getMailConfig: vi.fn(),
     saveMailConfig: vi.fn(),
     testMailConfig: vi.fn(),
+    listActivity: vi.fn(async () => []),
+    recordActivity: vi.fn(),
+    getCurrentUser: vi.fn(),
+    updateUserProfile: vi.fn(),
+    requestMagicLinkCode: vi.fn(),
+    verifyMagicLinkCode: vi.fn(),
+    getSyncStatus: vi.fn(),
+    configureSync: vi.fn(),
     ...overrides
   }
   Object.defineProperty(window, 'api', {

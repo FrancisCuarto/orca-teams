@@ -236,6 +236,27 @@ export class TeamWhiteboardCRDT implements ITeamWhiteboardCRDT {
     })
   }
 
+  syncFromWhiteboard(wb: TeamWhiteboard): void {
+    this.doc.transact(() => {
+      this.metadataMap.set('title', wb.title)
+      this.metadataMap.set('projectId', wb.projectId)
+      this.metadataMap.set('updatedAt', wb.updatedAt || Date.now())
+      this.viewportMap.set('x', wb.viewport.x)
+      this.viewportMap.set('y', wb.viewport.y)
+      this.viewportMap.set('zoom', wb.viewport.zoom)
+
+      const nextIds = new Set(wb.items.map((item) => item.id))
+      for (const existingId of Array.from(this.itemsMap.keys())) {
+        if (!nextIds.has(existingId)) {
+          this.itemsMap.delete(existingId)
+        }
+      }
+      for (const item of wb.items) {
+        writeWhiteboardItemToMap(this.itemsMap, item)
+      }
+    })
+  }
+
   subscribe(listener: (wb: TeamWhiteboard) => void): () => void {
     this.changeListeners.add(listener)
     return () => {

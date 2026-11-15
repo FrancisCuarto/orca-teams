@@ -5,11 +5,15 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  FileDiff,
   GitBranch,
+  GitMerge,
   Loader2,
   RotateCcw,
+  ShieldCheck,
   StopCircle,
   Terminal,
+  Trash2,
   XCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,6 +32,8 @@ type Props = {
   onOpenChange: (open: boolean) => void
   onCancel?: (executionId: string) => void
   onRerun?: () => void
+  onApprove?: (executionId: string, mergeToBase: boolean) => void
+  onReject?: (executionId: string, discardWorktree: boolean) => void
 }
 
 export function TeamAgentExecutionModal({
@@ -36,7 +42,9 @@ export function TeamAgentExecutionModal({
   execution,
   onOpenChange,
   onCancel,
-  onRerun
+  onRerun,
+  onApprove,
+  onReject
 }: Props): React.JSX.Element | null {
   const logsEndRef = useRef<HTMLDivElement>(null)
   const [copiedLogs, setCopiedLogs] = useState(false)
@@ -57,6 +65,8 @@ export function TeamAgentExecutionModal({
   }
 
   const isRunning = execution.status === 'running' || execution.status === 'queued'
+  const needsApproval =
+    execution.status === 'waiting_for_input' || execution.approvalStatus === 'pending'
   const intlLocale = getIntlLocale()
 
   const handleCopyLogs = async (): Promise<void> => {
@@ -112,6 +122,9 @@ export function TeamAgentExecutionModal({
                 {isRunning && (
                   <Loader2 className="w-2.5 h-2.5 mr-1 inline animate-spin text-primary" />
                 )}
+                {execution.status === 'waiting_for_input' && (
+                  <ShieldCheck className="w-2.5 h-2.5 mr-1 inline text-workspace-status-review" />
+                )}
                 {execution.status === 'completed' && (
                   <CheckCircle2 className="w-2.5 h-2.5 mr-1 inline text-workspace-status-review" />
                 )}
@@ -126,21 +139,80 @@ export function TeamAgentExecutionModal({
             </div>
           </div>
 
+          {execution.worktreePath && (
+            <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 p-2.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-2xs font-medium text-muted-foreground">
+                  Worktree aislado:
+                </span>
+                <span className="font-mono text-2xs text-foreground truncate">
+                  {execution.worktreePath}
+                </span>
+              </div>
+              {execution.changedFiles && execution.changedFiles.length > 0 && (
+                <div className="space-y-1 pt-1 border-t border-border/60">
+                  <span className="flex items-center gap-1 text-2xs font-medium text-muted-foreground">
+                    <FileDiff className="w-3 h-3 text-primary" />
+                    Archivos modificados ({execution.changedFiles.length})
+                  </span>
+                  <div className="max-h-20 overflow-y-auto scrollbar-sleek font-mono text-3xs text-foreground space-y-0.5">
+                    {execution.changedFiles.map((fileLine) => (
+                      <div key={fileLine}>{fileLine}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {needsApproval && (onApprove || onReject) && (
+            <div className="rounded-lg border border-annotation-highlight/30 bg-annotation-highlight/10 p-3 space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <ShieldCheck className="w-4 h-4 text-annotation-highlight" />
+                <span>Aprobación humana requerida antes de integrar cambios</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {onApprove && execution.worktreePath && (
+                  <Button type="button" size="xs" onClick={() => onApprove(execution.id, true)}>
+                    <GitMerge className="w-3.5 h-3.5" />
+                    Aprobar y Fusionar a {execution.baseBranch ?? 'rama base'}
+                  </Button>
+                )}
+                {onApprove && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="secondary"
+                    onClick={() => onApprove(execution.id, false)}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Aprobar sin fusionar
+                  </Button>
+                )}
+                {onReject && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="destructive"
+                    onClick={() => onReject(execution.id, Boolean(execution.worktreePath))}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {execution.worktreePath ? 'Rechazar y Descartar Worktree' : 'Rechazar'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-muted-foreground font-medium">
                 <Terminal className="w-3 h-3 text-primary" />
                 <span>Consola de Streaming de Logs</span>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                onClick={() => void handleCopyLogs()}
-                className="h-6 text-3xs gap-1"
-              >
+              <Button type="button" variant="ghost" size="xs" onClick={() => void handleCopyLogs()}>
                 {copiedLogs ? (
-                  <Check className="w-3 h-3 text-emerald-500" />
+                  <Check className="w-3 h-3 text-workspace-status-review" />
                 ) : (
                   <Copy className="w-3 h-3" />
                 )}
@@ -214,7 +286,7 @@ export function TeamAgentExecutionModal({
               Cancelar Ejecución
             </Button>
           )}
-          {!isRunning && onRerun && (
+          {!isRunning && !needsApproval && onRerun && (
             <Button type="button" variant="secondary" size="sm" onClick={onRerun}>
               <RotateCcw className="w-3.5 h-3.5 mr-1.5 inline" />
               Re-ejecutar

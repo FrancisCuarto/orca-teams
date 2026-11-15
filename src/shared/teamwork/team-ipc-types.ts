@@ -2,9 +2,12 @@ import type {
   AgentExecutionRecord,
   Project,
   Team,
+  TeamActivityEntry,
   TeamInvitation,
   TeamMember,
-  TeamRole
+  TeamRole,
+  TeamSyncSettings,
+  TeamUserProfile
 } from './team-workspace-types'
 import type { TeamKanbanCard } from './team-kanban-types'
 
@@ -82,16 +85,44 @@ export type TeamStartExecutionRequest = {
   projectPath?: string | null
   actorUserId: string
   sprintGoal?: string
+  isolateWorktree?: boolean
+  requiresApproval?: boolean
 }
 
 export type TeamExecutionEvent =
   | { type: 'updated'; execution: AgentExecutionRecord }
   | { type: 'removed'; executionId: string }
 
+export type TeamSyncRuntimeStatus = {
+  settings: TeamSyncSettings
+  hostingActive: boolean
+  hostingUrl: string | null
+  connectedPeers: number
+  activeRooms: number
+  lastError?: string
+}
+
+export type TeamApproveExecutionRequest = {
+  executionId: string
+  mergeToBase?: boolean
+  actorUserId?: string
+  actorName?: string
+}
+
+export type TeamRejectExecutionRequest = {
+  executionId: string
+  discardWorktree?: boolean
+  reason?: string
+  actorUserId?: string
+  actorName?: string
+}
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
+  approveExecution: (request: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
+  rejectExecution: (request: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
   getExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   getLatestExecutionForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
   onExecutionEvent: (callback: (event: TeamExecutionEvent) => void) => () => void
@@ -125,4 +156,23 @@ export type TeamApi = {
   getMailConfig: () => Promise<TeamMailConfigPublic>
   saveMailConfig: (input: TeamMailConfigInput) => Promise<TeamMailConfigPublic>
   testMailConfig: (toEmail: string) => Promise<{ ok: boolean; error?: string }>
+  listActivity: (options: {
+    teamId: string
+    projectId?: string
+    limit?: number
+  }) => Promise<TeamActivityEntry[]>
+  recordActivity: (entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>) => Promise<TeamActivityEntry>
+  getCurrentUser: () => Promise<TeamUserProfile>
+  updateUserProfile: (input: { displayName: string; email: string }) => Promise<TeamUserProfile>
+  requestMagicLinkCode: (
+    email: string,
+    displayName?: string
+  ) => Promise<{ sent: boolean; expiresAt: number; devCode?: string; error?: string }>
+  verifyMagicLinkCode: (
+    email: string,
+    code: string,
+    displayName?: string
+  ) => Promise<TeamUserProfile>
+  getSyncStatus: () => Promise<TeamSyncRuntimeStatus>
+  configureSync: (settings: Partial<TeamSyncSettings>) => Promise<TeamSyncRuntimeStatus>
 }

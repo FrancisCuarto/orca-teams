@@ -25,6 +25,7 @@ type Props = {
   projectId?: string
   projectPath?: string | null
   currentUserId?: string
+  currentUserName?: string
   humanMembers?: ExtendedTeamMember[]
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
@@ -34,6 +35,7 @@ export function TeamKanbanBoardView({
   projectId,
   projectPath,
   currentUserId = 'usr-francis',
+  currentUserName,
   humanMembers,
   onChange
 }: Props): React.JSX.Element {
@@ -52,6 +54,8 @@ export function TeamKanbanBoardView({
     cardStatuses,
     startCardExecution,
     cancelExecution,
+    approveExecution,
+    rejectExecution,
     hydrateLatestForCard
   } = useTeamAgentExecutions()
 
@@ -190,6 +194,22 @@ export function TeamKanbanBoardView({
           }
         }}
         onCancel={(executionId) => void cancelExecution(executionId)}
+        onApprove={(executionId, mergeToBase) =>
+          void approveExecution({
+            executionId,
+            mergeToBase,
+            actorUserId: currentUserId,
+            actorName: currentUserName
+          })
+        }
+        onReject={(executionId, discardWorktree) =>
+          void rejectExecution({
+            executionId,
+            discardWorktree,
+            actorUserId: currentUserId,
+            actorName: currentUserName
+          })
+        }
         onRerun={
           executionModalCard
             ? () => void actions.triggerImmediateExecution(executionModalCard)

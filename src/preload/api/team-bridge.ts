@@ -2,11 +2,17 @@ import { ipcRenderer } from 'electron'
 import type { PreloadApi } from '../api-types'
 import type {
   TeamApi,
+  TeamApproveExecutionRequest,
   TeamExecutionEvent,
   TeamMailConfigInput,
+  TeamRejectExecutionRequest,
   TeamSendInvitationRequest,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
+import type {
+  TeamActivityEntry,
+  TeamSyncSettings
+} from '../../shared/teamwork/team-workspace-types'
 
 export const teamApi: TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) =>
@@ -14,6 +20,10 @@ export const teamApi: TeamApi = {
   startExecution: (request: TeamStartExecutionRequest) =>
     ipcRenderer.invoke('team:startExecution', request),
   cancelExecution: (executionId: string) => ipcRenderer.invoke('team:cancelExecution', executionId),
+  approveExecution: (request: TeamApproveExecutionRequest) =>
+    ipcRenderer.invoke('team:approveExecution', request),
+  rejectExecution: (request: TeamRejectExecutionRequest) =>
+    ipcRenderer.invoke('team:rejectExecution', request),
   getExecution: (executionId: string) => ipcRenderer.invoke('team:getExecution', executionId),
   getLatestExecutionForCard: (cardId: string) =>
     ipcRenderer.invoke('team:getLatestExecutionForCard', cardId),
@@ -39,5 +49,19 @@ export const teamApi: TeamApi = {
     ipcRenderer.invoke('team:revokeInvitation', invitationId, actorUserId),
   getMailConfig: () => ipcRenderer.invoke('team:getMailConfig'),
   saveMailConfig: (input: TeamMailConfigInput) => ipcRenderer.invoke('team:saveMailConfig', input),
-  testMailConfig: (toEmail: string) => ipcRenderer.invoke('team:testMailConfig', toEmail)
+  testMailConfig: (toEmail: string) => ipcRenderer.invoke('team:testMailConfig', toEmail),
+  listActivity: (options: { teamId: string; projectId?: string; limit?: number }) =>
+    ipcRenderer.invoke('team:listActivity', options),
+  recordActivity: (entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>) =>
+    ipcRenderer.invoke('team:recordActivity', entry),
+  getCurrentUser: () => ipcRenderer.invoke('team:getCurrentUser'),
+  updateUserProfile: (input: { displayName: string; email: string }) =>
+    ipcRenderer.invoke('team:updateUserProfile', input),
+  requestMagicLinkCode: (email: string, displayName?: string) =>
+    ipcRenderer.invoke('team:requestMagicLinkCode', email, displayName),
+  verifyMagicLinkCode: (email: string, code: string, displayName?: string) =>
+    ipcRenderer.invoke('team:verifyMagicLinkCode', email, code, displayName),
+  getSyncStatus: () => ipcRenderer.invoke('team:getSyncStatus'),
+  configureSync: (settings: Partial<TeamSyncSettings>) =>
+    ipcRenderer.invoke('team:configureSync', settings)
 } satisfies NonNullable<PreloadApi['team']>

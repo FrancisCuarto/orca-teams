@@ -13,6 +13,8 @@ type Props = {
     avatarUrl?: string
     color?: string
   }
+  relayUrl?: string | null
+  syncToken?: string
   onPersist?: (wb: TeamWhiteboard) => void
   onCreateTask?: (item: TeamWhiteboard['items'][number]) => void
 }
@@ -22,14 +24,18 @@ export function TeamWhiteboardConnectedView({
   projectId,
   initialWhiteboard,
   currentUser,
+  relayUrl,
+  syncToken,
   onPersist,
   onCreateTask
 }: Props): React.JSX.Element {
-  const { whiteboard, remoteCursors, broadcastCursor } = useTeamWhiteboardSync({
+  const { whiteboard, remoteCursors, syncWhiteboard, broadcastCursor } = useTeamWhiteboardSync({
     whiteboardId,
     projectId,
     initialWhiteboard,
     currentUser,
+    relayUrl,
+    syncToken,
     onPersist
   })
 
@@ -39,7 +45,7 @@ export function TeamWhiteboardConnectedView({
       remoteCursors={remoteCursors}
       onCursorMove={broadcastCursor}
       onChange={(updated) => {
-        onPersist?.(updated)
+        syncWhiteboard(updated)
       }}
       onCreateTask={onCreateTask}
     />

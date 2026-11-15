@@ -22,6 +22,8 @@ export type CardFormDraftInput = {
   checklist: TeamKanbanChecklistItem[]
   estimatePoints?: number
   branchOrWorktree: string
+  isolateWorktree: boolean
+  requiresApproval: boolean
   blockedReason: string
 }
 
@@ -63,6 +65,8 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
     checklist: input.checklist,
     estimatePoints: input.estimatePoints,
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
+    isolateWorktree: input.isolateWorktree,
+    requiresApproval: input.requiresApproval,
     blockedReason: input.blockedReason.trim() || undefined,
     createdAt: existingCard?.createdAt ?? Date.now(),
     updatedAt: Date.now()

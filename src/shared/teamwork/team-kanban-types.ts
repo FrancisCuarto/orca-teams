@@ -34,6 +34,8 @@ export type TeamKanbanCard = {
   labels: string[]
   checklist: TeamKanbanChecklistItem[]
   branchOrWorktree?: string
+  isolateWorktree?: boolean
+  requiresApproval?: boolean
   estimatePoints?: number
   blockedReason?: string
   dueDate?: string
@@ -137,7 +139,7 @@ export type TeamNotesCollection = {
   updatedAt: number
 }
 
-export type TeamTab = 'kanban' | 'whiteboard' | 'notes'
+export type TeamTab = 'kanban' | 'whiteboard' | 'notes' | 'activity'
 
 export function isTeamKanbanPriority(value: string): value is TeamKanbanPriority {
   return value === 'low' || value === 'medium' || value === 'high' || value === 'urgent'

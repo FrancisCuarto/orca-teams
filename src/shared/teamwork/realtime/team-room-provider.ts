@@ -1,18 +1,79 @@
+import type * as Y from 'yjs'
 import type { CollaboratorPresence } from './team-crdt-types'
-import type { TeamBoardCRDT } from './team-crdt-board'
+
+export type CRDTSyncableDoc = {
+  readonly doc: Y.Doc
+  encodeStateAsUpdate(): Uint8Array
+  applyUpdate(update: Uint8Array, origin?: unknown): void
+}
+
+export type TeamRoomTransportStatus = 'connected' | 'syncing' | 'offline'
+
+export type TeamRoomTransportHandlers = {
+  onRemoteUpdate: (update: Uint8Array) => void
+  onRemotePresence: (presence: CollaboratorPresence) => void
+  onRemotePresenceLeave?: (userId: string) => void
+  onStatusChange?: (status: TeamRoomTransportStatus) => void
+  getInitialState: () => Uint8Array
+}
+
+export type TeamRoomTransport = {
+  connect(handlers: TeamRoomTransportHandlers): () => void
+  sendUpdate(update: Uint8Array): void
+  sendPresence(presence: CollaboratorPresence): void
+}
 
 export class TeamRoomProvider {
   private readonly presences = new Map<string, CollaboratorPresence>()
   private readonly presenceListeners = new Set<(presences: CollaboratorPresence[]) => void>()
+  private readonly statusListeners = new Set<(status: TeamRoomTransportStatus) => void>()
   private readonly peers = new Set<TeamRoomProvider>()
   private cleanupDocSubscription?: () => void
+  private cleanupTransport?: () => void
+  private status: TeamRoomTransportStatus = 'connected'
 
   constructor(
     public readonly roomId: string,
-    public readonly crdt: TeamBoardCRDT,
-    public readonly localUserId: string
+    public readonly crdt: CRDTSyncableDoc,
+    public readonly localUserId: string,
+    private readonly transport?: TeamRoomTransport
   ) {
     this.setupDocSync()
+    if (this.transport) {
+      this.status = 'syncing'
+      this.cleanupTransport = this.transport.connect({
+        onRemoteUpdate: (update) => {
+          this.crdt.applyUpdate(update, this)
+        },
+        onRemotePresence: (presence) => {
+          this.receiveRemotePresence(presence)
+        },
+        onRemotePresenceLeave: (userId) => {
+          if (this.presences.delete(userId)) {
+            this.notifyPresenceChange()
+          }
+        },
+        onStatusChange: (nextStatus) => {
+          this.status = nextStatus
+          for (const listener of this.statusListeners) {
+            listener(nextStatus)
+          }
+        },
+        getInitialState: () => this.crdt.encodeStateAsUpdate()
+      })
+    }
+  }
+
+  getStatus(): TeamRoomTransportStatus {
+    return this.status
+  }
+
+  onStatusChange(listener: (status: TeamRoomTransportStatus) => void): () => void {
+    this.statusListeners.add(listener)
+    listener(this.status)
+    return () => {
+      this.statusListeners.delete(listener)
+    }
   }
 
   updatePresence(presence: Omit<CollaboratorPresence, 'lastSeen'>): void {
@@ -26,6 +87,7 @@ export class TeamRoomProvider {
     for (const peer of this.peers) {
       peer.receiveRemotePresence(fullPresence)
     }
+    this.transport?.sendPresence(fullPresence)
   }
 
   getPresences(): CollaboratorPresence[] {
@@ -62,14 +124,12 @@ export class TeamRoomProvider {
     this.peers.add(peer)
     peer.peers.add(this)
 
-    // Sync full state initially between peers
     const localUpdate = this.crdt.encodeStateAsUpdate()
     const peerUpdate = peer.crdt.encodeStateAsUpdate()
 
     peer.crdt.applyUpdate(localUpdate, this)
     this.crdt.applyUpdate(peerUpdate, peer)
 
-    // Exchange existing presences
     for (const p of this.getPresences()) {
       peer.receiveRemotePresence(p)
     }
@@ -89,25 +149,34 @@ export class TeamRoomProvider {
   }
 
   destroy(): void {
-    if (this.cleanupDocSubscription) {
-      this.cleanupDocSubscription()
-    }
+    this.cleanupTransport?.()
+    this.cleanupTransport = undefined
+    this.cleanupDocSubscription?.()
+    this.cleanupDocSubscription = undefined
     for (const peer of this.peers) {
       peer.peers.delete(this)
     }
     this.peers.clear()
     this.presenceListeners.clear()
+    this.statusListeners.clear()
     this.presences.clear()
   }
 
   private setupDocSync(): void {
-    this.crdt.doc.on('update', (update: Uint8Array, origin: unknown) => {
+    const handler = (update: Uint8Array, origin: unknown): void => {
       for (const peer of this.peers) {
         if (peer !== origin) {
           peer.crdt.applyUpdate(update, this)
         }
       }
-    })
+      if (origin !== this) {
+        this.transport?.sendUpdate(update)
+      }
+    }
+    this.crdt.doc.on('update', handler)
+    this.cleanupDocSubscription = () => {
+      this.crdt.doc.off('update', handler)
+    }
   }
 
   private notifyPresenceChange(): void {

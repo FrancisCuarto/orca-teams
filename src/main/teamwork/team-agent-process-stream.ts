@@ -32,7 +32,11 @@ export function resolveWorkingDirectory(
 }
 
 export function cloneExecutionRecord(record: AgentExecutionRecord): AgentExecutionRecord {
-  return { ...record, logs: record.logs.map((entry) => ({ ...entry })) }
+  return {
+    ...record,
+    ...(record.changedFiles ? { changedFiles: [...record.changedFiles] } : {}),
+    logs: record.logs.map((entry) => ({ ...entry }))
+  }
 }
 
 export function appendExecutionLog(
@@ -55,11 +59,23 @@ export function wireAgentChildProcess(options: {
   executionId: string
   record: AgentExecutionRecord
   child: ChildProcess
+  requiresApproval?: boolean
+  inspectChanges?: () => Promise<string[]>
   isCancelled: () => boolean
   onFinishProcess: () => void
   onEmitUpdated: () => void
+  onNotifyOutcome?: () => void
 }): void {
-  const { record, child, isCancelled, onFinishProcess, onEmitUpdated } = options
+  const {
+    record,
+    child,
+    requiresApproval,
+    inspectChanges,
+    isCancelled,
+    onFinishProcess,
+    onEmitUpdated,
+    onNotifyOutcome
+  } = options
   let stdoutBuf = ''
   let stderrBuf = ''
 
@@ -103,6 +119,7 @@ export function wireAgentChildProcess(options: {
     record.updatedAt = record.completedAt
     appendExecutionLog(record, 'error', `Error de proceso: ${err.message}`)
     onEmitUpdated()
+    onNotifyOutcome?.()
   })
 
   child.on('close', (code, signal) => {
@@ -122,23 +139,44 @@ export function wireAgentChildProcess(options: {
       onEmitUpdated()
       return
     }
-    const now = Date.now()
-    record.completedAt = now
-    record.updatedAt = now
-    if (code === 0) {
-      record.status = 'completed'
-      const tailInfo = record.logs
-        .filter((l) => l.level === 'info')
-        .slice(-4)
-        .map((l) => l.message)
-        .join('\n')
-      record.outputSummary = tailInfo.slice(0, 600) || 'Ejecución completada correctamente.'
-      appendExecutionLog(record, 'info', 'Proceso finalizado con código 0.')
-    } else {
-      record.status = 'failed'
-      record.error = `El agente finalizó con código ${code ?? signal ?? 'desconocido'}.`
-      appendExecutionLog(record, 'error', record.error)
+
+    const finalize = async (): Promise<void> => {
+      const now = Date.now()
+      record.updatedAt = now
+      if (code === 0) {
+        if (inspectChanges) {
+          record.changedFiles = await inspectChanges()
+        }
+        const tailInfo = record.logs
+          .filter((l) => l.level === 'info')
+          .slice(-4)
+          .map((l) => l.message)
+          .join('\n')
+        record.outputSummary = tailInfo.slice(0, 600) || 'Ejecución completada correctamente.'
+
+        if (requiresApproval) {
+          record.status = 'waiting_for_input'
+          record.approvalStatus = 'pending'
+          appendExecutionLog(
+            record,
+            'info',
+            'Proceso finalizado con código 0. Esperando aprobación humana para integrar cambios.'
+          )
+        } else {
+          record.status = 'completed'
+          record.completedAt = now
+          appendExecutionLog(record, 'info', 'Proceso finalizado con código 0.')
+        }
+      } else {
+        record.status = 'failed'
+        record.completedAt = now
+        record.error = `El agente finalizó con código ${code ?? signal ?? 'desconocido'}.`
+        appendExecutionLog(record, 'error', record.error)
+      }
+      onEmitUpdated()
+      onNotifyOutcome?.()
     }
-    onEmitUpdated()
+
+    void finalize()
   })
 }

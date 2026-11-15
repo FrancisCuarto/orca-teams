@@ -187,6 +187,21 @@ export class TeamEmailService {
     return this.sendEmail({ toEmail: payload.toEmail, subject, text, html })
   }
 
+  async sendAuthCodeEmail(toEmail: string, code: string): Promise<TeamEmailSendResult> {
+    return this.sendEmail({
+      toEmail,
+      subject: `Tu código de acceso a Orca Teams: ${code}`,
+      text: [
+        'Usa este código de verificación para iniciar sesión en Orca Teams:',
+        '',
+        code,
+        '',
+        'Este código expira en 15 minutos.'
+      ].join('\n'),
+      html: `<p>Usa este código de verificación para iniciar sesión en <strong>Orca Teams</strong>:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${code}</p><p>Expira en 15 minutos.</p>`
+    })
+  }
+
   async testMailConfig(toEmail: string): Promise<{ ok: boolean; error?: string }> {
     const res = await this.sendEmail({
       toEmail,

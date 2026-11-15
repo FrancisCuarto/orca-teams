@@ -108,6 +108,25 @@ export class TeamNotesCRDT implements ITeamNotesCRDT {
     })
   }
 
+  syncFromCollection(collection: TeamNotesCollection): void {
+    this.doc.transact(() => {
+      this.metadataMap.set('projectId', collection.projectId)
+      this.metadataMap.set('updatedAt', collection.updatedAt || Date.now())
+      const nextIds = new Set(collection.notes.map((n) => n.id))
+      for (const existingId of Array.from(this.notesMap.keys())) {
+        if (!nextIds.has(existingId)) {
+          this.notesMap.delete(existingId)
+        }
+      }
+      for (const note of collection.notes) {
+        const current = this.notesMap.get(note.id)
+        if (!current || JSON.stringify(current) !== JSON.stringify(note)) {
+          this.notesMap.set(note.id, note)
+        }
+      }
+    })
+  }
+
   subscribe(listener: (collection: TeamNotesCollection) => void): () => void {
     this.changeListeners.add(listener)
     return () => {

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { TeamStartExecutionRequest } from '../../../../../shared/teamwork/team-ipc-types'
+import type {
+  TeamApproveExecutionRequest,
+  TeamRejectExecutionRequest,
+  TeamStartExecutionRequest
+} from '../../../../../shared/teamwork/team-ipc-types'
 import type {
   AgentExecutionRecord,
   AgentExecutionStatus
@@ -18,6 +22,8 @@ export type UseTeamAgentExecutionsResult = {
   cardStatuses: Record<string, AgentExecutionStatus>
   startCardExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord | null>
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
+  approveExecution: (options: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
+  rejectExecution: (options: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
   getLatestForCard: (cardId: string) => AgentExecutionRecord | null
   hydrateLatestForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
 }
@@ -108,6 +114,36 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     [recordExecution]
   )
 
+  const approveExecution = useCallback(
+    async (options: TeamApproveExecutionRequest): Promise<AgentExecutionRecord | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.approveExecution) {
+        return null
+      }
+      const updated = await teamApi.approveExecution(options)
+      if (updated) {
+        recordExecution(updated)
+      }
+      return updated
+    },
+    [recordExecution]
+  )
+
+  const rejectExecution = useCallback(
+    async (options: TeamRejectExecutionRequest): Promise<AgentExecutionRecord | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.rejectExecution) {
+        return null
+      }
+      const updated = await teamApi.rejectExecution(options)
+      if (updated) {
+        recordExecution(updated)
+      }
+      return updated
+    },
+    [recordExecution]
+  )
+
   const getLatestForCard = useCallback(
     (cardId: string): AgentExecutionRecord | null => executionsByCard.get(cardId) ?? null,
     [executionsByCard]
@@ -142,6 +178,8 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     cardStatuses,
     startCardExecution,
     cancelExecution,
+    approveExecution,
+    rejectExecution,
     getLatestForCard,
     hydrateLatestForCard
   }

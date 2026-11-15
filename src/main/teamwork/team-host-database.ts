@@ -9,6 +9,7 @@ import type {
   AgentExecutionRecord,
   Project,
   Team,
+  TeamActivityEntry,
   TeamInvitation
 } from '../../shared/teamwork/team-workspace-types'
 import type {
@@ -76,7 +77,7 @@ export class TeamHostDatabase {
     })
   }
 
-  private upsertMemberProfile(userId: string, displayName: string, email: string): void {
+  upsertMemberProfile(userId: string, displayName: string, email: string): void {
     this.db
       .prepare(
         `INSERT INTO team_member_profiles (user_id, display_name, email, updated_at)
@@ -193,6 +194,11 @@ export class TeamHostDatabase {
       .prepare(
         `UPDATE agent_executions
          SET status = ?, logs_json = ?, output_summary = ?, error = ?,
+             branch_or_worktree = COALESCE(?, branch_or_worktree),
+             worktree_path = COALESCE(?, worktree_path),
+             base_branch = COALESCE(?, base_branch),
+             approval_status = COALESCE(?, approval_status),
+             changed_files_json = COALESCE(?, changed_files_json),
              started_at = COALESCE(?, started_at),
              completed_at = COALESCE(?, completed_at),
              updated_at = ?
@@ -203,6 +209,11 @@ export class TeamHostDatabase {
         JSON.stringify(record.logs),
         record.outputSummary ?? null,
         record.error ?? null,
+        record.branchOrWorktree ?? null,
+        record.worktreePath ?? null,
+        record.baseBranch ?? null,
+        record.approvalStatus ?? null,
+        record.changedFiles ? JSON.stringify(record.changedFiles) : null,
         record.startedAt ?? null,
         record.completedAt ?? null,
         record.updatedAt,
@@ -216,6 +227,65 @@ export class TeamHostDatabase {
 
   getLatestExecutionForCard(cardId: string): AgentExecutionRecord | null {
     return this.service.getLatestExecutionForTask(cardId)
+  }
+
+  recordActivity(entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>): TeamActivityEntry {
+    return this.service.recordActivity(entry)
+  }
+
+  listActivity(options: {
+    teamId: string
+    projectId?: string
+    limit?: number
+  }): TeamActivityEntry[] {
+    return this.service.listActivity(options)
+  }
+
+  saveSyncSnapshot(roomId: string, stateBase64: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO team_sync_snapshots (room_id, state_base64, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(room_id) DO UPDATE SET
+           state_base64 = excluded.state_base64,
+           updated_at = excluded.updated_at`
+      )
+      .run(roomId, stateBase64, Date.now())
+  }
+
+  getSyncSnapshot(roomId: string): string | null {
+    const row = this.db
+      .prepare('SELECT state_base64 FROM team_sync_snapshots WHERE room_id = ?')
+      .get(roomId)
+    return isRecord(row) && typeof row.state_base64 === 'string' ? row.state_base64 : null
+  }
+
+  createAuthChallenge(email: string, codeHash: string, expiresAt: number): string {
+    const id = `auth-${randomUUID().slice(0, 12)}`
+    this.db
+      .prepare(
+        `INSERT INTO team_auth_challenges (id, email, code_hash, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(id, email.trim().toLowerCase(), codeHash, expiresAt, Date.now())
+    return id
+  }
+
+  consumeAuthChallenge(email: string, codeHash: string): boolean {
+    const normalized = email.trim().toLowerCase()
+    const now = Date.now()
+    const row = this.db
+      .prepare(
+        `SELECT id FROM team_auth_challenges
+         WHERE email = ? AND code_hash = ? AND used_at IS NULL AND expires_at >= ?
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(normalized, codeHash, now)
+    if (!isRecord(row) || typeof row.id !== 'string') {
+      return false
+    }
+    this.db.prepare('UPDATE team_auth_challenges SET used_at = ? WHERE id = ?').run(now, row.id)
+    return true
   }
 
   close(): void {

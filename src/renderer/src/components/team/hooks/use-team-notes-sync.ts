@@ -7,6 +7,7 @@ import type {
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { TeamNotesCRDT } from '../../../../../shared/teamwork/realtime/team-crdt-notes'
 import { TeamRoomProvider } from '../../../../../shared/teamwork/realtime/team-room-provider'
+import { TeamWebSocketTransport } from '../../../../../shared/teamwork/realtime/team-ws-transport'
 import type { SyncStatus } from './use-team-kanban-sync'
 import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 
@@ -18,6 +19,8 @@ export type UseTeamNotesSyncOptions = {
     avatarUrl?: string
     color?: string
   }
+  relayUrl?: string | null
+  syncToken?: string
   initialNotes?: TeamNotesCollection | null
   onPersist?: (collection: TeamNotesCollection) => void
 }
@@ -32,11 +35,14 @@ export type UseTeamNotesSyncReturn = {
   deleteNote: (noteId: string) => void
   updateNoteStatus: (noteId: string, status?: TeamNoteStatus) => void
   updateNoteCategory: (noteId: string, category: TeamNoteCategory) => void
+  syncNotesCollection: (collection: TeamNotesCollection) => void
 }
 
 export function useTeamNotesSync({
   projectId,
   currentUser,
+  relayUrl,
+  syncToken,
   initialNotes,
   onPersist
 }: UseTeamNotesSyncOptions): UseTeamNotesSyncReturn {
@@ -49,25 +55,36 @@ export function useTeamNotesSync({
 
   const crdtRef = useRef<TeamNotesCRDT | null>(null)
   const roomProviderRef = useRef<TeamRoomProvider | null>(null)
+  const initialNotesRef = useRef(initialNotes)
+  initialNotesRef.current = initialNotes
   const onPersistRef = useRef(onPersist)
   onPersistRef.current = onPersist
 
   useEffect(() => {
     const roomId = `project:${projectId}:notes:collection`
     const crdt = new TeamNotesCRDT(projectId)
-    // TeamRoomProvider soporta cualquier CRDT con encodeStateAsUpdate y applyUpdate
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const room = new TeamRoomProvider(roomId, crdt as any, currentUser.userId)
+    const transport = relayUrl?.trim()
+      ? new TeamWebSocketTransport({
+          url: relayUrl.trim(),
+          roomId,
+          userId: currentUser.userId,
+          token: syncToken
+        })
+      : undefined
+    const room = new TeamRoomProvider(roomId, crdt, currentUser.userId, transport)
 
     crdtRef.current = crdt
     roomProviderRef.current = room
 
-    if (initialNotes) {
-      crdt.initializeFromCollection(initialNotes)
+    if (initialNotesRef.current) {
+      crdt.initializeFromCollection(initialNotesRef.current)
     }
 
     setNotesCollection(crdt.getNotesCollection())
-    setSyncStatus('connected')
+
+    const unsubscribeStatus = room.onStatusChange((nextStatus) => {
+      setSyncStatus(nextStatus)
+    })
 
     room.updatePresence({
       userId: currentUser.userId,
@@ -93,6 +110,7 @@ export function useTeamNotesSync({
 
     return () => {
       clearInterval(presenceInterval)
+      unsubscribeStatus()
       unsubscribeNotes()
       unsubscribePresence()
       room.destroy()
@@ -102,51 +120,46 @@ export function useTeamNotesSync({
     }
   }, [
     projectId,
+    relayUrl,
+    syncToken,
     currentUser.userId,
     currentUser.displayName,
     currentUser.avatarUrl,
-    currentUser.color,
-    initialNotes
+    currentUser.color
   ])
 
   const setActiveNoteId = useCallback(
     (noteId: string | null) => {
       setActiveNoteIdState(noteId)
-      if (roomProviderRef.current) {
-        roomProviderRef.current.updatePresence({
-          userId: currentUser.userId,
-          displayName: currentUser.displayName,
-          avatarUrl: currentUser.avatarUrl,
-          color: currentUser.color ?? '#8b5cf6',
-          activeNoteId: noteId ?? undefined
-        })
-      }
+      roomProviderRef.current?.updatePresence({
+        userId: currentUser.userId,
+        displayName: currentUser.displayName,
+        avatarUrl: currentUser.avatarUrl,
+        color: currentUser.color ?? '#8b5cf6',
+        activeNoteId: noteId ?? undefined
+      })
     },
     [currentUser.userId, currentUser.displayName, currentUser.avatarUrl, currentUser.color]
   )
 
   const upsertNote = useCallback((note: TeamNote) => {
-    if (crdtRef.current) {
-      crdtRef.current.upsertNote(note)
-    }
+    crdtRef.current?.upsertNote(note)
   }, [])
 
   const deleteNote = useCallback((noteId: string) => {
-    if (crdtRef.current) {
-      crdtRef.current.deleteNote(noteId)
-    }
+    crdtRef.current?.deleteNote(noteId)
   }, [])
 
   const updateNoteStatus = useCallback((noteId: string, status?: TeamNoteStatus) => {
-    if (crdtRef.current) {
-      crdtRef.current.updateNoteStatus(noteId, status)
-    }
+    crdtRef.current?.updateNoteStatus(noteId, status)
   }, [])
 
   const updateNoteCategory = useCallback((noteId: string, category: TeamNoteCategory) => {
-    if (crdtRef.current) {
-      crdtRef.current.updateNoteCategory(noteId, category)
-    }
+    crdtRef.current?.updateNoteCategory(noteId, category)
+  }, [])
+
+  const syncNotesCollection = useCallback((collection: TeamNotesCollection) => {
+    crdtRef.current?.syncFromCollection(collection)
   }, [])
 
   return {
@@ -158,6 +171,7 @@ export function useTeamNotesSync({
     upsertNote,
     deleteNote,
     updateNoteStatus,
-    updateNoteCategory
+    updateNoteCategory,
+    syncNotesCollection
   }
 }

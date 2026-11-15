@@ -12,6 +12,8 @@ type Props = {
     avatarUrl?: string
     color?: string
   }
+  relayUrl?: string | null
+  syncToken?: string
   onPersist?: (notes: TeamNotesCollection) => void
   onExtractTasksToKanban?: (noteTitle: string, content: string) => void
 }
@@ -20,12 +22,16 @@ export function TeamNotesConnectedView({
   projectId,
   initialNotes,
   currentUser,
+  relayUrl,
+  syncToken,
   onPersist,
   onExtractTasksToKanban
 }: Props): React.JSX.Element {
-  const { notesCollection, activeNoteId, setActiveNoteId } = useTeamNotesSync({
+  const { notesCollection, activeNoteId, setActiveNoteId, syncNotesCollection } = useTeamNotesSync({
     projectId,
     currentUser,
+    relayUrl,
+    syncToken,
     initialNotes,
     onPersist
   })
@@ -36,7 +42,7 @@ export function TeamNotesConnectedView({
       activeNoteId={activeNoteId}
       onSelectNoteId={setActiveNoteId}
       onChange={(updated) => {
-        onPersist?.(updated)
+        syncNotesCollection(updated)
       }}
       onExtractTasksToKanban={onExtractTasksToKanban}
     />

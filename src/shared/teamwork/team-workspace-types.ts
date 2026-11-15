@@ -165,6 +165,10 @@ export const AgentExecutionLogSchema = z.object({
   message: z.string()
 })
 
+export type AgentApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export const AgentApprovalStatusSchema = z.enum(['pending', 'approved', 'rejected'])
+
 export type AgentExecutionRecord = {
   id: string
   taskId: string
@@ -175,6 +179,10 @@ export type AgentExecutionRecord = {
   status: AgentExecutionStatus
   prompt: string
   branchOrWorktree?: string
+  worktreePath?: string
+  baseBranch?: string
+  approvalStatus?: AgentApprovalStatus
+  changedFiles?: string[]
   logs: AgentExecutionLog[]
   outputSummary?: string
   idempotencyKey: string
@@ -195,6 +203,10 @@ export const AgentExecutionRecordSchema = z.object({
   status: AgentExecutionStatusSchema,
   prompt: z.string().min(1),
   branchOrWorktree: z.string().optional(),
+  worktreePath: z.string().optional(),
+  baseBranch: z.string().optional(),
+  approvalStatus: AgentApprovalStatusSchema.optional(),
+  changedFiles: z.array(z.string()).optional(),
   logs: z.array(AgentExecutionLogSchema),
   outputSummary: z.string().optional(),
   idempotencyKey: z.string().min(1),
@@ -204,6 +216,42 @@ export const AgentExecutionRecordSchema = z.object({
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative()
 })
+
+export type TeamActivityActorType = 'human' | 'agent' | 'system'
+
+export type TeamActivityEntry = {
+  id: string
+  teamId: string
+  projectId?: string
+  actorId: string
+  actorName: string
+  actorType: TeamActivityActorType
+  action: string
+  targetType: 'team' | 'project' | 'member' | 'invitation' | 'card' | 'execution' | 'note' | 'sync'
+  targetId?: string
+  summary: string
+  metadata?: Record<string, unknown>
+  createdAt: number
+}
+
+export type TeamUserProfile = {
+  userId: string
+  email: string
+  displayName: string
+  avatarUrl?: string
+  authMethod: 'local' | 'magic-link'
+  authenticatedAt: number
+}
+
+export type TeamSyncMode = 'local' | 'host' | 'remote'
+
+export type TeamSyncSettings = {
+  mode: TeamSyncMode
+  relayUrl: string
+  hostPort: number
+  roomSecret?: string
+  autoConnect: boolean
+}
 
 export function hasTeamPermission(userRole: TeamRole, requiredRole: TeamRole): boolean {
   const roleHierarchy: Record<TeamRole, number> = {
