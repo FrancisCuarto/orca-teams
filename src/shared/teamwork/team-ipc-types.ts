@@ -9,7 +9,7 @@ import type {
   TeamSyncSettings,
   TeamUserProfile
 } from './team-workspace-types'
-import type { TeamKanbanCard } from './team-kanban-types'
+import type { ExternalTeamIssue, TeamKanbanCard } from './team-kanban-types'
 
 export type ConfiguredTeamAgent = {
   id: string
@@ -117,6 +117,19 @@ export type TeamRejectExecutionRequest = {
   actorName?: string
 }
 
+export type TeamFetchExternalIssuesRequest =
+  | {
+      provider: 'github'
+      repoPath: string
+      limit?: number
+    }
+  | {
+      provider: 'linear'
+      apiKey: string
+      teamKey?: string
+      limit?: number
+    }
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
@@ -175,4 +188,5 @@ export type TeamApi = {
   ) => Promise<TeamUserProfile>
   getSyncStatus: () => Promise<TeamSyncRuntimeStatus>
   configureSync: (settings: Partial<TeamSyncSettings>) => Promise<TeamSyncRuntimeStatus>
+  fetchExternalIssues: (request: TeamFetchExternalIssuesRequest) => Promise<ExternalTeamIssue[]>
 }

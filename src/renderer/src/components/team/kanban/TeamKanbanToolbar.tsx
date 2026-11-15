@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, Plus, Search, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Download, Plus, Search, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +16,7 @@ type Props = {
   onStatusFilterChange: (value: 'all' | 'blocked' | 'agents') => void
   onClearFilters: () => void
   onCreateTask: () => void
+  onOpenImportIssues?: () => void
 }
 
 export function TeamKanbanToolbar({
@@ -29,7 +30,8 @@ export function TeamKanbanToolbar({
   onPriorityChange,
   onStatusFilterChange,
   onClearFilters,
-  onCreateTask
+  onCreateTask,
+  onOpenImportIssues
 }: Props): React.JSX.Element {
   const hasActiveFilters =
     searchQuery !== '' ||
@@ -118,6 +120,12 @@ export function TeamKanbanToolbar({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {onOpenImportIssues ? (
+          <Button type="button" size="sm" variant="outline" onClick={onOpenImportIssues}>
+            <Download className="size-3.5" />
+            Importar Issues
+          </Button>
+        ) : null}
         <Button size="sm" onClick={onCreateTask}>
           <Plus className="size-3.5" />
           Nueva Tarea

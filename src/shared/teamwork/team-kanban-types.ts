@@ -24,6 +24,27 @@ export type TeamKanbanChecklistItem = {
   done: boolean
 }
 
+export type ExternalIssueProvider = 'github' | 'linear'
+
+export type ExternalIssueRef = {
+  provider: ExternalIssueProvider
+  id: string
+  key: string
+  url: string
+}
+
+export type ExternalTeamIssue = {
+  provider: ExternalIssueProvider
+  id: string
+  key: string
+  title: string
+  description: string
+  url: string
+  labels: string[]
+  priority: TeamKanbanPriority
+  state: string
+}
+
 export type TeamKanbanCard = {
   id: string
   title: string
@@ -33,6 +54,7 @@ export type TeamKanbanCard = {
   assignee?: TeamKanbanAssignee
   labels: string[]
   checklist: TeamKanbanChecklistItem[]
+  externalIssueRef?: ExternalIssueRef
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
@@ -151,4 +173,24 @@ export function isTeamNoteCategory(value: string): value is TeamNoteCategory {
 
 export function isTeamNoteStatus(value: string): value is TeamNoteStatus {
   return value === 'draft' || value === 'proposed' || value === 'accepted' || value === 'deprecated'
+}
+
+export function isExternalIssueProvider(value: unknown): value is ExternalIssueProvider {
+  return value === 'github' || value === 'linear'
+}
+
+export function isExternalIssueRef(value: unknown): value is ExternalIssueRef {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  return (
+    'provider' in value &&
+    isExternalIssueProvider(value.provider) &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'key' in value &&
+    typeof value.key === 'string' &&
+    'url' in value &&
+    typeof value.url === 'string'
+  )
 }

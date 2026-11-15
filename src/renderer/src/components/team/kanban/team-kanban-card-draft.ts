@@ -63,11 +63,15 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
       : undefined,
     labels,
     checklist: input.checklist,
+    ...(existingCard?.externalIssueRef
+      ? { externalIssueRef: { ...existingCard.externalIssueRef } }
+      : {}),
     estimatePoints: input.estimatePoints,
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
     isolateWorktree: input.isolateWorktree,
     requiresApproval: input.requiresApproval,
     blockedReason: input.blockedReason.trim() || undefined,
+    ...(existingCard?.dueDate ? { dueDate: existingCard.dueDate } : {}),
     createdAt: existingCard?.createdAt ?? Date.now(),
     updatedAt: Date.now()
   }

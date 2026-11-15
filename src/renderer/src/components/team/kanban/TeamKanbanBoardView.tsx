@@ -3,13 +3,19 @@ import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from
 import { toast } from 'sonner'
 import type {
   ExtendedTeamMember,
+  ExternalTeamIssue,
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
-import { computeBoardSprintMetrics } from './team-kanban-board-mutations'
+import { getTeamPreloadApi } from '../hooks/use-team-workspace-registry-actions'
+import {
+  computeBoardSprintMetrics,
+  importExternalIssuesToBoard
+} from './team-kanban-board-mutations'
 import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
+import { TeamIssueImporterModal } from './TeamIssueImporterModal'
 import { TeamKanbanCardModal } from './TeamKanbanCardModal'
 import { TeamKanbanColumnsViewport } from './TeamKanbanColumnsViewport'
 import { TeamKanbanDragOverlay } from './TeamKanbanDragOverlay'
@@ -22,6 +28,7 @@ import { useKanbanDragHandlers } from './use-kanban-drag-handlers'
 
 type Props = {
   board: TeamKanbanBoard
+  teamId?: string
   projectId?: string
   projectPath?: string | null
   currentUserId?: string
@@ -32,6 +39,7 @@ type Props = {
 
 export function TeamKanbanBoardView({
   board,
+  teamId = 'team-local',
   projectId,
   projectPath,
   currentUserId = 'usr-francis',
@@ -41,6 +49,7 @@ export function TeamKanbanBoardView({
 }: Props): React.JSX.Element {
   const [editingCard, setEditingCard] = useState<TeamKanbanCard | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined)
   const [executionModalCardId, setExecutionModalCardId] = useState<string | null>(null)
 
@@ -113,6 +122,49 @@ export function TeamKanbanBoardView({
     [board, onChange]
   )
 
+  const handleImportExternalIssues = useCallback(
+    (selectedIssues: ExternalTeamIssue[], destinationColumnId: string): void => {
+      const { nextBoard, createdCards } = importExternalIssuesToBoard(
+        board,
+        selectedIssues,
+        destinationColumnId
+      )
+      if (createdCards.length === 0) {
+        toast.info('Todos los issues seleccionados ya existen en el tablero')
+        return
+      }
+      onChange(nextBoard)
+      const provider = selectedIssues[0]?.provider === 'linear' ? 'Linear' : 'GitHub'
+      toast.success(
+        `${createdCards.length} ${createdCards.length === 1 ? 'issue importado' : 'issues importados'} desde ${provider}`
+      )
+
+      const teamApi = getTeamPreloadApi()
+      if (teamApi?.recordActivity) {
+        void teamApi
+          .recordActivity({
+            teamId,
+            projectId: projectId ?? board.projectId ?? 'proj-default',
+            actorId: currentUserId,
+            actorName: currentUserName ?? currentUserId,
+            actorType: 'human',
+            action: 'issues.imported',
+            targetType: 'card',
+            summary: `Importó ${createdCards.length} ${createdCards.length === 1 ? 'issue' : 'issues'} desde ${provider}`,
+            metadata: {
+              provider: selectedIssues[0]?.provider,
+              count: createdCards.length,
+              keys: createdCards
+                .map((card) => card.externalIssueRef?.key)
+                .filter((key): key is string => typeof key === 'string')
+            }
+          })
+          .catch(() => undefined)
+      }
+    },
+    [board, currentUserId, currentUserName, onChange, projectId, teamId]
+  )
+
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-background">
       <TeamKanbanToolbar
@@ -127,6 +179,7 @@ export function TeamKanbanBoardView({
         onStatusFilterChange={filters.setStatusFilter}
         onClearFilters={filters.handleClearFilters}
         onCreateTask={() => handleOpenNewCard()}
+        onOpenImportIssues={() => setIsImportModalOpen(true)}
       />
       <TeamKanbanSprintHeader
         sprintGoal={board.sprintGoal}
@@ -183,6 +236,15 @@ export function TeamKanbanBoardView({
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
         onDispatchAgent={actions.handleDispatchAgent}
+      />
+      <TeamIssueImporterModal
+        isOpen={isImportModalOpen}
+        columns={board.columns}
+        defaultColumnId={board.columns[0]?.id}
+        existingCards={board.cards}
+        projectPath={projectPath}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportExternalIssues}
       />
       <TeamAgentExecutionModal
         open={Boolean(executionModalCardId && activeExecution)}

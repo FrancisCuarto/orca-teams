@@ -4,6 +4,7 @@ import type {
   TeamApi,
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
+  TeamFetchExternalIssuesRequest,
   TeamMailConfigInput,
   TeamRejectExecutionRequest,
   TeamSendInvitationRequest,
@@ -63,5 +64,7 @@ export const teamApi: TeamApi = {
     ipcRenderer.invoke('team:verifyMagicLinkCode', email, code, displayName),
   getSyncStatus: () => ipcRenderer.invoke('team:getSyncStatus'),
   configureSync: (settings: Partial<TeamSyncSettings>) =>
-    ipcRenderer.invoke('team:configureSync', settings)
+    ipcRenderer.invoke('team:configureSync', settings),
+  fetchExternalIssues: (request: TeamFetchExternalIssuesRequest) =>
+    ipcRenderer.invoke('team:fetchExternalIssues', request)
 } satisfies NonNullable<PreloadApi['team']>

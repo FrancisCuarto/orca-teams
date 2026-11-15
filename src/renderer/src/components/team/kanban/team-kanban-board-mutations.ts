@@ -1,5 +1,7 @@
 import { arrayMove } from '@dnd-kit/sortable'
+import { buildKanbanCardsFromExternalIssues } from '../../../../../shared/teamwork/team-issue-card-builder'
 import type {
+  ExternalTeamIssue,
   TeamKanbanAssignee,
   TeamKanbanBoard,
   TeamKanbanCard
@@ -272,6 +274,29 @@ export function extractActionItemsFromMarkdownToBoard(
   }
 
   return { nextBoard, createdCount }
+}
+
+export function importExternalIssuesToBoard(
+  board: TeamKanbanBoard,
+  issues: readonly ExternalTeamIssue[],
+  targetColumnId?: string
+): { nextBoard: TeamKanbanBoard; createdCards: TeamKanbanCard[] } {
+  const destinationColumnId =
+    targetColumnId && board.columns.some((col) => col.id === targetColumnId)
+      ? targetColumnId
+      : (board.columns[0]?.id ?? 'col-backlog')
+
+  const createdCards = buildKanbanCardsFromExternalIssues(issues, {
+    existingCards: board.cards,
+    targetColumnId: destinationColumnId
+  })
+
+  let nextBoard = board
+  for (const card of createdCards) {
+    nextBoard = upsertKanbanCard(nextBoard, card).nextBoard
+  }
+
+  return { nextBoard, createdCards }
 }
 
 export function computeBoardSprintMetrics(board: TeamKanbanBoard): BoardSprintMetrics {

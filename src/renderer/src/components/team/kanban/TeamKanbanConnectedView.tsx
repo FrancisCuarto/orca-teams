@@ -8,6 +8,7 @@ import { TeamBoardPresenceBar } from './TeamBoardPresenceBar'
 import { TeamKanbanBoardView } from './TeamKanbanBoardView'
 
 type Props = {
+  teamId?: string
   projectId: string
   projectPath?: string | null
   initialBoard: TeamKanbanBoard
@@ -24,6 +25,7 @@ type Props = {
 }
 
 export function TeamKanbanConnectedView({
+  teamId,
   projectId,
   projectPath,
   initialBoard,
@@ -63,6 +65,7 @@ export function TeamKanbanConnectedView({
       />
       <TeamKanbanBoardView
         board={activeBoard}
+        teamId={teamId}
         projectId={projectId}
         projectPath={projectPath}
         currentUserId={currentUser.userId}

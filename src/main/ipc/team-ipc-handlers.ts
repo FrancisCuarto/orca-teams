@@ -3,6 +3,7 @@ import type {
   TeamApi,
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
+  TeamFetchExternalIssuesRequest,
   TeamRejectExecutionRequest,
   TeamSendInvitationRequest,
   TeamSendInvitationResult,
@@ -19,6 +20,7 @@ import { TeamAgentRunner } from '../teamwork/team-agent-runner'
 import { TeamAuthService } from '../teamwork/team-auth-service'
 import { TeamEmailService } from '../teamwork/team-email-service'
 import { TeamHostDatabase } from '../teamwork/team-host-database'
+import { fetchGitHubIssues, fetchLinearIssues } from '../teamwork/team-issue-importer'
 import { TeamSyncRelayServer } from '../teamwork/team-sync-relay-server'
 import { registerTeamAuthSyncAndMailHandlers } from './team-workspace-ipc'
 
@@ -313,6 +315,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
 
   ipcMain.handle('team:revokeInvitation', (_event, invitationId: string, actorUserId: string) =>
     db.revokeInvitation(invitationId, actorUserId)
+  )
+
+  ipcMain.handle(
+    'team:fetchExternalIssues',
+    async (_event, request: TeamFetchExternalIssuesRequest) => {
+      switch (request.provider) {
+        case 'github':
+          return fetchGitHubIssues({ repoPath: request.repoPath, limit: request.limit })
+        case 'linear':
+          return fetchLinearIssues({
+            apiKey: request.apiKey,
+            teamKey: request.teamKey,
+            limit: request.limit
+          })
+      }
+    }
   )
 
   registerTeamAuthSyncAndMailHandlers({ db, emailService, authService, syncServer })

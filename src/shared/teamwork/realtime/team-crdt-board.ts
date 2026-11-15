@@ -1,6 +1,114 @@
 import * as Y from 'yjs'
-import type { TeamKanbanBoard, TeamKanbanCard, TeamKanbanColumn } from '../team-kanban-types'
+import {
+  isExternalIssueRef,
+  isTeamKanbanPriority,
+  type TeamKanbanAssignee,
+  type TeamKanbanBoard,
+  type TeamKanbanCard,
+  type TeamKanbanChecklistItem,
+  type TeamKanbanColumn
+} from '../team-kanban-types'
 import type { ITeamBoardCRDT } from './team-crdt-types'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readAssignee(raw: unknown): TeamKanbanAssignee | undefined {
+  if (
+    !isRecord(raw) ||
+    (raw.type !== 'human' && raw.type !== 'agent') ||
+    typeof raw.name !== 'string'
+  ) {
+    return undefined
+  }
+  const skills = Array.isArray(raw.skills)
+    ? raw.skills.filter((s): s is string => typeof s === 'string')
+    : undefined
+  return {
+    type: raw.type,
+    name: raw.name,
+    ...(typeof raw.avatar === 'string' ? { avatar: raw.avatar } : {}),
+    ...(typeof raw.agentType === 'string' ? { agentType: raw.agentType } : {}),
+    ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
+    ...(skills ? { skills } : {})
+  }
+}
+
+function readChecklist(raw: unknown): TeamKanbanChecklistItem[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  const items: TeamKanbanChecklistItem[] = []
+  for (const entry of raw) {
+    if (isRecord(entry) && typeof entry.id === 'string' && typeof entry.text === 'string') {
+      items.push({ id: entry.id, text: entry.text, done: Boolean(entry.done) })
+    }
+  }
+  return items
+}
+
+export function readKanbanCardFromMap(raw: unknown): TeamKanbanCard | null {
+  if (
+    !isRecord(raw) ||
+    typeof raw.id !== 'string' ||
+    typeof raw.title !== 'string' ||
+    typeof raw.columnId !== 'string'
+  ) {
+    return null
+  }
+  const priority =
+    typeof raw.priority === 'string' && isTeamKanbanPriority(raw.priority) ? raw.priority : 'medium'
+  const labels = Array.isArray(raw.labels)
+    ? raw.labels.filter((label): label is string => typeof label === 'string')
+    : []
+  const assignee = readAssignee(raw.assignee)
+  const externalIssueRef = isExternalIssueRef(raw.externalIssueRef)
+    ? { ...raw.externalIssueRef }
+    : undefined
+  const createdAt = typeof raw.createdAt === 'number' ? raw.createdAt : Date.now()
+  const updatedAt = typeof raw.updatedAt === 'number' ? raw.updatedAt : createdAt
+
+  return {
+    id: raw.id,
+    title: raw.title,
+    description: typeof raw.description === 'string' ? raw.description : '',
+    columnId: raw.columnId,
+    priority,
+    ...(assignee ? { assignee } : {}),
+    labels,
+    checklist: readChecklist(raw.checklist),
+    ...(externalIssueRef ? { externalIssueRef } : {}),
+    ...(typeof raw.branchOrWorktree === 'string' ? { branchOrWorktree: raw.branchOrWorktree } : {}),
+    ...(typeof raw.isolateWorktree === 'boolean' ? { isolateWorktree: raw.isolateWorktree } : {}),
+    ...(typeof raw.requiresApproval === 'boolean'
+      ? { requiresApproval: raw.requiresApproval }
+      : {}),
+    ...(typeof raw.estimatePoints === 'number' ? { estimatePoints: raw.estimatePoints } : {}),
+    ...(typeof raw.blockedReason === 'string' ? { blockedReason: raw.blockedReason } : {}),
+    ...(typeof raw.dueDate === 'string' ? { dueDate: raw.dueDate } : {}),
+    createdAt,
+    updatedAt
+  }
+}
+
+function cloneCardForStorage(
+  card: TeamKanbanCard,
+  existing?: TeamKanbanCard
+): TeamKanbanCard {
+  const externalIssueRef = card.externalIssueRef
+    ? { ...card.externalIssueRef }
+    : existing?.externalIssueRef
+      ? { ...existing.externalIssueRef }
+      : undefined
+  return {
+    ...card,
+    labels: [...card.labels],
+    checklist: card.checklist.map((item) => ({ ...item })),
+    ...(card.assignee ? { assignee: { ...card.assignee } } : {}),
+    ...(externalIssueRef ? { externalIssueRef } : {})
+  }
+}
 
 export class TeamBoardCRDT implements ITeamBoardCRDT {
   public readonly doc: Y.Doc
@@ -32,7 +140,13 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
   }
 
   getBoard(): TeamKanbanBoard {
-    const rawCards = this.cardsMap.toJSON() as Record<string, TeamKanbanCard>
+    const cards: Record<string, TeamKanbanCard> = {}
+    this.cardsMap.forEach((rawCard, cardId) => {
+      const card = readKanbanCardFromMap(rawCard)
+      if (card) {
+        cards[cardId] = card
+      }
+    })
     const columns = this.columnsArray.toArray()
     const metadata = this.metadataMap.toJSON()
 
@@ -50,7 +164,7 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
       description,
       sprintGoal,
       columns,
-      cards: rawCards,
+      cards,
       createdAt,
       updatedAt
     }
@@ -79,16 +193,21 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
       this.columnsArray.push(board.columns)
 
       for (const [cardId, card] of Object.entries(board.cards)) {
-        this.cardsMap.set(cardId, card)
+        this.cardsMap.set(cardId, cloneCardForStorage(card))
       }
     })
   }
 
   upsertCard(card: TeamKanbanCard): void {
     this.doc.transact(() => {
-      const existing = this.cardsMap.get(card.id)
-      this.cardsMap.set(card.id, { ...card, updatedAt: Date.now() })
-      this.metadataMap.set('updatedAt', Date.now())
+      const existingRaw = this.cardsMap.get(card.id)
+      const existing = existingRaw ? (readKanbanCardFromMap(existingRaw) ?? undefined) : undefined
+      const now = Date.now()
+      this.cardsMap.set(card.id, {
+        ...cloneCardForStorage(card, existing),
+        updatedAt: now
+      })
+      this.metadataMap.set('updatedAt', now)
 
       const isNew = !existing
       const targetColId = card.columnId
@@ -124,14 +243,16 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
 
   moveCard(cardId: string, targetColumnId: string, newIndex?: number): void {
     this.doc.transact(() => {
-      const card = this.cardsMap.get(cardId)
+      const rawCard = this.cardsMap.get(cardId)
+      const card = rawCard ? readKanbanCardFromMap(rawCard) : null
       if (!card) {
         return
       }
 
-      const updatedCard = { ...card, columnId: targetColumnId, updatedAt: Date.now() }
+      const now = Date.now()
+      const updatedCard = { ...card, columnId: targetColumnId, updatedAt: now }
       this.cardsMap.set(cardId, updatedCard)
-      this.metadataMap.set('updatedAt', Date.now())
+      this.metadataMap.set('updatedAt', now)
 
       const columns = this.columnsArray.toArray()
       const updated = columns.map((col) => {
@@ -178,8 +299,9 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
       }
       for (const [cardId, card] of Object.entries(board.cards)) {
         const current = this.cardsMap.get(cardId)
-        if (!current || JSON.stringify(current) !== JSON.stringify(card)) {
-          this.cardsMap.set(cardId, card)
+        const normalized = cloneCardForStorage(card)
+        if (!current || JSON.stringify(current) !== JSON.stringify(normalized)) {
+          this.cardsMap.set(cardId, normalized)
         }
       }
 

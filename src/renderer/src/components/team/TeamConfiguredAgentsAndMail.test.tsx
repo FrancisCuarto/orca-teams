@@ -74,6 +74,7 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     verifyMagicLinkCode: vi.fn(),
     getSyncStatus: vi.fn(),
     configureSync: vi.fn(),
+    fetchExternalIssues: vi.fn(async () => []),
     ...overrides
   }
   Object.defineProperty(window, 'api', {
