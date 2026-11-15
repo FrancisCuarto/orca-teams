@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import type {
@@ -6,9 +6,13 @@ import type {
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import { TeamFactoryConfigModal } from '../factory/TeamFactoryConfigModal'
+import { TeamFactoryRunModal } from '../factory/TeamFactoryRunModal'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
-import { computeBoardSprintMetrics } from './team-kanban-board-mutations'
+import { useTeamFactory } from '../hooks/use-team-factory'
+import { computeBoardSprintMetrics, moveKanbanCardToColumn } from './team-kanban-board-mutations'
+import { shouldMoveToInProgress } from './team-kanban-execution-helpers'
 import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
 import { TeamKanbanCardModal } from './TeamKanbanCardModal'
 import { TeamKanbanColumnsViewport } from './TeamKanbanColumnsViewport'
@@ -41,6 +45,10 @@ export function TeamKanbanBoardView({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined)
   const [executionModalCardId, setExecutionModalCardId] = useState<string | null>(null)
+  const [factoryModalCardId, setFactoryModalCardId] = useState<string | null>(null)
+  const [isFactoryConfigOpen, setIsFactoryConfigOpen] = useState(false)
+
+  const resolvedProjectId = projectId ?? board.projectId ?? 'proj-default'
 
   const {
     memberEntries: configuredAgents,
@@ -54,6 +62,7 @@ export function TeamKanbanBoardView({
     cancelExecution,
     hydrateLatestForCard
   } = useTeamAgentExecutions()
+  const factory = useTeamFactory(resolvedProjectId)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const cardMap = useMemo(() => board.cards, [board.cards])
@@ -62,7 +71,7 @@ export function TeamKanbanBoardView({
 
   const actions = useKanbanBoardActions({
     board,
-    projectId: projectId ?? board.projectId ?? 'proj-default',
+    projectId: resolvedProjectId,
     projectPath,
     actorUserId: currentUserId,
     configuredAgents,
@@ -79,10 +88,92 @@ export function TeamKanbanBoardView({
     onChange
   })
 
+  const seenFactoryStatusesRef = useRef<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    let nextBoard = board
+    let changed = false
+    for (const run of factory.factoryRunsByCard.values()) {
+      const prevStatus = seenFactoryStatusesRef.current.get(run.id)
+      if (prevStatus === run.status) {
+        continue
+      }
+      seenFactoryStatusesRef.current.set(run.id, run.status)
+      if (!prevStatus) {
+        continue
+      }
+      const card = nextBoard.cards[run.cardId]
+      if (!card) {
+        continue
+      }
+      let targetColId: string | null = null
+      if (run.status === 'waiting_human' && nextBoard.columns.some((c) => c.id === 'col-review')) {
+        targetColId = 'col-review'
+      } else if (run.status === 'completed' && nextBoard.columns.some((c) => c.id === 'col-done')) {
+        targetColId = 'col-done'
+      }
+      if (targetColId && card.columnId !== targetColId) {
+        const moved = moveKanbanCardToColumn(nextBoard, card.id, targetColId)
+        if (moved) {
+          nextBoard = moved
+          changed = true
+        }
+      }
+    }
+    if (changed) {
+      onChange(nextBoard)
+    }
+  }, [board, factory.factoryRunsByCard, onChange])
+
+  const handleStartFactory = useCallback(
+    async (card: TeamKanbanCard) => {
+      if (shouldMoveToInProgress(board, card.columnId)) {
+        const moved = moveKanbanCardToColumn(board, card.id, 'col-in-progress')
+        if (moved) {
+          onChange(moved)
+        }
+      }
+      try {
+        const run = await factory.startFactoryRun({
+          card,
+          projectId: resolvedProjectId,
+          projectPath,
+          actorUserId: currentUserId,
+          sprintGoal: board.sprintGoal,
+          configOverride: factory.factoryConfig
+        })
+        if (run) {
+          seenFactoryStatusesRef.current.set(run.id, run.status)
+          setFactoryModalCardId(card.id)
+          toast.info(`Software Factory iniciada para "${card.title}"`)
+        } else {
+          toast.warning('Runtime de Software Factory no disponible en este entorno')
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'No se pudo iniciar Software Factory')
+      }
+    },
+    [board, currentUserId, factory, onChange, projectPath, resolvedProjectId]
+  )
+
+  const handleViewFactory = useCallback(
+    (card: TeamKanbanCard) => {
+      setFactoryModalCardId(card.id)
+      if (!factory.factoryRunsByCard.has(card.id)) {
+        void factory.hydrateFactoryRunForCard(card.id)
+      }
+    },
+    [factory]
+  )
+
   const activeCard = dnd.activeCardId ? (cardMap[dnd.activeCardId] ?? null) : null
   const executionModalCard = executionModalCardId ? (cardMap[executionModalCardId] ?? null) : null
   const activeExecution = executionModalCardId
     ? (executionsByCard.get(executionModalCardId) ?? null)
+    : null
+  const factoryModalCard = factoryModalCardId ? (cardMap[factoryModalCardId] ?? null) : null
+  const activeFactoryRun = factoryModalCardId
+    ? (factory.factoryRunsByCard.get(factoryModalCardId) ?? null)
     : null
 
   const handleOpenNewCard = useCallback(
@@ -118,10 +209,13 @@ export function TeamKanbanBoardView({
         statusFilter={filters.statusFilter}
         filteredCount={filters.filteredCards.length}
         filteredPoints={filters.filteredPoints}
+        activeFactoryCount={factory.activeRunCount}
+        waitingHumanCount={factory.waitingHumanCount}
         onSearchChange={filters.setSearchQuery}
         onPriorityChange={filters.setSelectedPriority}
         onStatusFilterChange={filters.setStatusFilter}
         onClearFilters={filters.handleClearFilters}
+        onOpenFactoryConfig={() => setIsFactoryConfigOpen(true)}
         onCreateTask={() => handleOpenNewCard()}
       />
       <TeamKanbanSprintHeader
@@ -142,11 +236,14 @@ export function TeamKanbanBoardView({
             columns={board.columns}
             columnCardsMap={filters.columnCardsMap}
             cardStatuses={cardStatuses}
+            factoryRunsByCard={factory.factoryRunsByCard}
             onAddCard={handleOpenNewCard}
             onDeleteColumn={actions.handleDeleteColumn}
             onEditCard={handleEditCard}
             onDispatchAgent={actions.handleDispatchAgent}
             onViewExecution={actions.handleViewExecution}
+            onStartFactory={(card) => void handleStartFactory(card)}
+            onViewFactory={handleViewFactory}
             onToggleChecklistItem={actions.handleToggleChecklistItem}
             onQuickMoveColumn={actions.handleQuickMoveColumn}
             onUpdateColumnWipLimit={actions.handleUpdateColumnWipLimit}
@@ -195,6 +292,33 @@ export function TeamKanbanBoardView({
             ? () => void actions.triggerImmediateExecution(executionModalCard)
             : undefined
         }
+      />
+      <TeamFactoryConfigModal
+        open={isFactoryConfigOpen}
+        config={factory.factoryConfig}
+        configuredAgents={configuredAgents}
+        onOpenChange={setIsFactoryConfigOpen}
+        onSave={factory.saveFactoryConfig}
+      />
+      <TeamFactoryRunModal
+        open={Boolean(factoryModalCardId && activeFactoryRun)}
+        run={activeFactoryRun}
+        actorUserId={currentUserId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFactoryModalCardId(null)
+          }
+        }}
+        onCancel={(runId) => void factory.cancelFactoryRun(runId)}
+        onResolveHumanGate={(runId, decision, comment) =>
+          void factory.resolveHumanGate({
+            runId,
+            decision,
+            actorUserId: currentUserId,
+            comment
+          })
+        }
+        onRerun={factoryModalCard ? () => void handleStartFactory(factoryModalCard) : undefined}
       />
     </div>
   )

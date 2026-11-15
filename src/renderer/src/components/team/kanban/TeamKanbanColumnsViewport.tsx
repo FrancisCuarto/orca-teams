@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Plus } from 'lucide-react'
+import type { FactoryRunRecord } from '../../../../../shared/teamwork/team-factory-types'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
@@ -14,11 +15,14 @@ type Props = {
   columns: TeamKanbanColumn[]
   columnCardsMap: Map<string, TeamKanbanCard[]>
   cardStatuses: Record<string, AgentExecutionStatus>
+  factoryRunsByCard?: Map<string, FactoryRunRecord>
   onAddCard: (columnId: string) => void
   onDeleteColumn: (columnId: string) => void
   onEditCard: (card: TeamKanbanCard) => void
   onDispatchAgent: (card: TeamKanbanCard) => void
   onViewExecution: (card: TeamKanbanCard) => void
+  onStartFactory?: (card: TeamKanbanCard) => void
+  onViewFactory?: (card: TeamKanbanCard) => void
   onToggleChecklistItem: (cardId: string, itemId: string) => void
   onQuickMoveColumn: (cardId: string, targetColId: string) => void
   onUpdateColumnWipLimit: (columnId: string, wipLimit?: number) => void
@@ -29,11 +33,14 @@ export function TeamKanbanColumnsViewport({
   columns,
   columnCardsMap,
   cardStatuses,
+  factoryRunsByCard,
   onAddCard,
   onDeleteColumn,
   onEditCard,
   onDispatchAgent,
   onViewExecution,
+  onStartFactory,
+  onViewFactory,
   onToggleChecklistItem,
   onQuickMoveColumn,
   onUpdateColumnWipLimit,
@@ -61,11 +68,14 @@ export function TeamKanbanColumnsViewport({
           cards={columnCardsMap.get(column.id) ?? []}
           canDelete={columns.length > 1 && column.cardIds.length === 0}
           cardExecutions={cardStatuses}
+          factoryRunsByCard={factoryRunsByCard}
           onAddCard={onAddCard}
           onDeleteColumn={onDeleteColumn}
           onEditCard={onEditCard}
           onDispatchAgent={onDispatchAgent}
           onViewExecution={onViewExecution}
+          onStartFactory={onStartFactory}
+          onViewFactory={onViewFactory}
           onToggleChecklistItem={onToggleChecklistItem}
           onQuickMoveColumn={onQuickMoveColumn}
           onUpdateColumnWipLimit={onUpdateColumnWipLimit}

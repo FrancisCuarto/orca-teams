@@ -16,9 +16,16 @@ import type {
   TeamSendInvitationRequest,
   TeamWorkspaceSnapshot
 } from '../../shared/teamwork/team-ipc-types'
+import type { FactoryConfig, FactoryRunRecord } from '../../shared/teamwork/team-factory-types'
 import {
   isRecord,
   mapInvitationRow,
+  persistFactoryConfig,
+  persistFactoryRun,
+  queryFactoryConfig,
+  queryFactoryRun,
+  queryFactoryRunsForProject,
+  queryLatestFactoryRunForCard,
   queryWorkspaceSnapshot,
   slugify
 } from './team-host-database-queries'
@@ -216,6 +223,30 @@ export class TeamHostDatabase {
 
   getLatestExecutionForCard(cardId: string): AgentExecutionRecord | null {
     return this.service.getLatestExecutionForTask(cardId)
+  }
+
+  getFactoryConfig(projectId: string): FactoryConfig {
+    return queryFactoryConfig(this.db, projectId)
+  }
+
+  saveFactoryConfig(config: FactoryConfig): FactoryConfig {
+    return persistFactoryConfig(this.db, config)
+  }
+
+  upsertFactoryRun(run: FactoryRunRecord): void {
+    persistFactoryRun(this.db, run)
+  }
+
+  getFactoryRun(runId: string): FactoryRunRecord | null {
+    return queryFactoryRun(this.db, runId)
+  }
+
+  getLatestFactoryRunForCard(cardId: string): FactoryRunRecord | null {
+    return queryLatestFactoryRunForCard(this.db, cardId)
+  }
+
+  listFactoryRuns(projectId: string): FactoryRunRecord[] {
+    return queryFactoryRunsForProject(this.db, projectId)
   }
 
   close(): void {

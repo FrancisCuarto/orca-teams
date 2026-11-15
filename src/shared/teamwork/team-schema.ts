@@ -76,6 +76,26 @@ CREATE TABLE IF NOT EXISTS agent_executions (
 );
 CREATE INDEX IF NOT EXISTS agent_executions_task_id ON agent_executions(task_id);
 CREATE INDEX IF NOT EXISTS agent_executions_project_id ON agent_executions(project_id);
+
+CREATE TABLE IF NOT EXISTS factory_configs (
+  project_id TEXT PRIMARY KEY,
+  config_json TEXT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS factory_runs (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  current_stage TEXT NOT NULL,
+  run_json TEXT NOT NULL,
+  started_at BIGINT NOT NULL,
+  completed_at BIGINT,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS factory_runs_card_id ON factory_runs(card_id);
+CREATE INDEX IF NOT EXISTS factory_runs_project_id ON factory_runs(project_id);
 `
 
 export function teamSchemaStatements(): string[] {

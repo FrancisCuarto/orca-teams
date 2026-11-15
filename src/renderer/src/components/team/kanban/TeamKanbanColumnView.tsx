@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { AlertCircle, Gauge, Plus, Trash2 } from 'lucide-react'
+import type { FactoryRunRecord } from '../../../../../shared/teamwork/team-factory-types'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
@@ -19,11 +20,14 @@ type Props = {
   columns?: TeamKanbanColumn[]
   canDelete?: boolean
   cardExecutions?: Record<string, AgentExecutionStatus>
+  factoryRunsByCard?: Map<string, FactoryRunRecord>
   onAddCard: (columnId: string) => void
   onDeleteColumn?: (columnId: string) => void
   onEditCard: (card: TeamKanbanCard) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
   onViewExecution?: (card: TeamKanbanCard) => void
+  onStartFactory?: (card: TeamKanbanCard) => void
+  onViewFactory?: (card: TeamKanbanCard) => void
   onToggleChecklistItem?: (cardId: string, itemId: string) => void
   onQuickMoveColumn?: (cardId: string, targetColId: string) => void
   onUpdateColumnWipLimit?: (columnId: string, wipLimit?: number) => void
@@ -35,11 +39,14 @@ export function TeamKanbanColumnView({
   columns,
   canDelete = false,
   cardExecutions,
+  factoryRunsByCard,
   onAddCard,
   onDeleteColumn,
   onEditCard,
   onDispatchAgent,
   onViewExecution,
+  onStartFactory,
+  onViewFactory,
   onToggleChecklistItem,
   onQuickMoveColumn,
   onUpdateColumnWipLimit
@@ -219,7 +226,10 @@ export function TeamKanbanColumnView({
               card={card}
               columns={columns}
               executionStatus={cardExecutions?.[card.id]}
+              factoryRun={factoryRunsByCard?.get(card.id)}
               onViewExecution={onViewExecution}
+              onStartFactory={onStartFactory}
+              onViewFactory={onViewFactory}
               onEdit={onEditCard}
               onDispatchAgent={onDispatchAgent}
               onToggleChecklistItem={onToggleChecklistItem}

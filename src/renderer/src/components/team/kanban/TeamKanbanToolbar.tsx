@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, Plus, Search, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Factory, Plus, Search, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,10 +11,13 @@ type Props = {
   statusFilter: 'all' | 'blocked' | 'agents'
   filteredCount: number
   filteredPoints: number
+  activeFactoryCount?: number
+  waitingHumanCount?: number
   onSearchChange: (value: string) => void
   onPriorityChange: (value: string) => void
   onStatusFilterChange: (value: 'all' | 'blocked' | 'agents') => void
   onClearFilters: () => void
+  onOpenFactoryConfig?: () => void
   onCreateTask: () => void
 }
 
@@ -25,10 +28,13 @@ export function TeamKanbanToolbar({
   statusFilter,
   filteredCount,
   filteredPoints,
+  activeFactoryCount = 0,
+  waitingHumanCount = 0,
   onSearchChange,
   onPriorityChange,
   onStatusFilterChange,
   onClearFilters,
+  onOpenFactoryConfig,
   onCreateTask
 }: Props): React.JSX.Element {
   const hasActiveFilters =
@@ -118,6 +124,28 @@ export function TeamKanbanToolbar({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {onOpenFactoryConfig ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onOpenFactoryConfig}
+            title="Configurar roles, checks y gate determinista de Software Factory"
+          >
+            <Factory className="size-3.5" />
+            <span>Factory</span>
+            {activeFactoryCount > 0 ? (
+              <Badge variant="secondary" className="text-3xs px-1 py-0 h-4">
+                {activeFactoryCount}
+              </Badge>
+            ) : null}
+            {waitingHumanCount > 0 ? (
+              <Badge variant="destructive" className="text-3xs px-1 py-0 h-4">
+                {waitingHumanCount} gate
+              </Badge>
+            ) : null}
+          </Button>
+        ) : null}
         <Button size="sm" onClick={onCreateTask}>
           <Plus className="size-3.5" />
           Nueva Tarea

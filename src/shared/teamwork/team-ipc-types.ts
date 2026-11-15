@@ -7,6 +7,7 @@ import type {
   TeamRole
 } from './team-workspace-types'
 import type { TeamKanbanCard } from './team-kanban-types'
+import type { FactoryConfig, FactoryRunRecord } from './team-factory-types'
 
 export type ConfiguredTeamAgent = {
   id: string
@@ -88,6 +89,26 @@ export type TeamExecutionEvent =
   | { type: 'updated'; execution: AgentExecutionRecord }
   | { type: 'removed'; executionId: string }
 
+export type TeamStartFactoryRunRequest = {
+  card: TeamKanbanCard
+  projectId: string
+  projectPath?: string | null
+  actorUserId: string
+  sprintGoal?: string
+  configOverride?: FactoryConfig
+}
+
+export type TeamResolveFactoryGateRequest = {
+  runId: string
+  decision: 'approve' | 'reject'
+  actorUserId: string
+  comment?: string
+}
+
+export type TeamFactoryEvent =
+  | { type: 'updated'; run: FactoryRunRecord }
+  | { type: 'removed'; runId: string }
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
@@ -95,6 +116,17 @@ export type TeamApi = {
   getExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   getLatestExecutionForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
   onExecutionEvent: (callback: (event: TeamExecutionEvent) => void) => () => void
+  getFactoryConfig: (projectId: string) => Promise<FactoryConfig>
+  saveFactoryConfig: (config: FactoryConfig) => Promise<FactoryConfig>
+  startFactoryRun: (request: TeamStartFactoryRunRequest) => Promise<FactoryRunRecord>
+  cancelFactoryRun: (runId: string) => Promise<FactoryRunRecord | null>
+  resolveFactoryHumanGate: (
+    request: TeamResolveFactoryGateRequest
+  ) => Promise<FactoryRunRecord | null>
+  getFactoryRun: (runId: string) => Promise<FactoryRunRecord | null>
+  getLatestFactoryRunForCard: (cardId: string) => Promise<FactoryRunRecord | null>
+  listFactoryRuns: (projectId: string) => Promise<FactoryRunRecord[]>
+  onFactoryEvent: (callback: (event: TeamFactoryEvent) => void) => () => void
   getWorkspaceSnapshot: () => Promise<TeamWorkspaceSnapshot>
   createTeam: (input: {
     name: string
