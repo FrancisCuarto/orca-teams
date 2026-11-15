@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   TeamKanbanBoard,
-  TeamKanbanCard
+  TeamKanbanCard,
+  TeamWhiteboardItem
 } from '../../../../../shared/teamwork/team-kanban-types'
 import {
   applyReviewRequestToKanbanCard,
   computeBoardSprintMetrics,
+  convertWhiteboardElementsToBoard,
   extractActionItemsFromMarkdownToBoard,
+  isConvertibleWhiteboardElement,
   moveKanbanCardAcrossColumns,
   toggleKanbanCardChecklistItem,
   upsertKanbanCard
@@ -407,5 +410,89 @@ describe('applyReviewRequestToKanbanCard', () => {
     expect(mergedResult.nextBoard.columns.find((c) => c.id === 'col-doing')?.cardIds).not.toContain(
       'card-3'
     )
+  })
+})
+
+describe('convertWhiteboardElementsToBoard', () => {
+  it('filters convertible elements (sticky, text, shape with text) and ignores draw/arrow/empty shape', () => {
+    const sticky: TeamWhiteboardItem = {
+      id: 'wb-sticky-1',
+      type: 'sticky',
+      title: 'API Gateway',
+      content: 'Rate limit y auth',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 150
+    }
+    const textItem: TeamWhiteboardItem = {
+      id: 'wb-text-1',
+      type: 'text',
+      content: '## Migrar base de datos\nEjecutar script',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 150
+    }
+    const shapeWithText: TeamWhiteboardItem = {
+      id: 'wb-shape-1',
+      type: 'shape',
+      shapeKind: 'rect',
+      content: 'Auth Service',
+      x: 0,
+      y: 0,
+      width: 150,
+      height: 100
+    }
+    const emptyShape: TeamWhiteboardItem = {
+      id: 'wb-shape-empty',
+      type: 'shape',
+      shapeKind: 'ellipse',
+      content: '   ',
+      x: 0,
+      y: 0,
+      width: 150,
+      height: 100
+    }
+    const drawItem: TeamWhiteboardItem = {
+      id: 'wb-draw-1',
+      type: 'draw',
+      content: '',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100
+    }
+
+    expect(isConvertibleWhiteboardElement(sticky)).toBe(true)
+    expect(isConvertibleWhiteboardElement(textItem)).toBe(true)
+    expect(isConvertibleWhiteboardElement(shapeWithText)).toBe(true)
+    expect(isConvertibleWhiteboardElement(emptyShape)).toBe(false)
+    expect(isConvertibleWhiteboardElement(drawItem)).toBe(false)
+
+    const { nextBoard, createdCount, skippedDuplicateCount, createdCards } =
+      convertWhiteboardElementsToBoard(makeBoard(), [
+        sticky,
+        textItem,
+        shapeWithText,
+        emptyShape,
+        drawItem
+      ])
+
+    expect(createdCount).toBe(3)
+    expect(skippedDuplicateCount).toBe(0)
+    expect(createdCards.map((c) => c.title)).toEqual([
+      'API Gateway',
+      'Migrar base de datos',
+      'Auth Service'
+    ])
+    expect(createdCards[0]?.sourceWhiteboardElementId).toBe('wb-sticky-1')
+    expect(createdCards[1]?.sourceWhiteboardElementId).toBe('wb-text-1')
+    expect(createdCards[2]?.sourceWhiteboardElementId).toBe('wb-shape-1')
+
+    // Re-running with the same element deduplicates via sourceWhiteboardElementId
+    const secondPass = convertWhiteboardElementsToBoard(nextBoard, [sticky])
+    expect(secondPass.createdCount).toBe(0)
+    expect(secondPass.skippedDuplicateCount).toBe(1)
   })
 })

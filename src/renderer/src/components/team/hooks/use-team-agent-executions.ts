@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { TeamNote } from '../../../../../shared/teamwork/team-kanban-types'
 import type {
   TeamApproveExecutionRequest,
   TeamCreateReviewRequestRequest,
   TeamExecutionDiffResult,
+  TeamLinkedNoteContext,
   TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamRequestExecutionChangesRequest,
@@ -18,6 +20,38 @@ function getTeamApi() {
     return undefined
   }
   return window.api?.team
+}
+
+export function resolveLinkedNotesContext(
+  linkedNoteIds: readonly string[] | undefined,
+  availableNotes: readonly TeamNote[] | undefined
+): TeamLinkedNoteContext[] | undefined {
+  if (!linkedNoteIds?.length || !availableNotes?.length) {
+    return undefined
+  }
+  const notesById = new Map(availableNotes.map((note) => [note.id, note]))
+  const seen = new Set<string>()
+  const resolved: TeamLinkedNoteContext[] = []
+  for (const noteId of linkedNoteIds) {
+    const trimmed = noteId.trim()
+    if (!trimmed || seen.has(trimmed)) {
+      continue
+    }
+    seen.add(trimmed)
+    const note = notesById.get(trimmed)
+    if (note) {
+      resolved.push({
+        id: note.id,
+        title: note.title,
+        content: note.content
+      })
+    }
+  }
+  return resolved.length > 0 ? resolved : undefined
+}
+
+export type UseTeamAgentExecutionsOptions = {
+  availableNotes?: readonly TeamNote[]
 }
 
 export type UseTeamAgentExecutionsResult = {
@@ -42,7 +76,10 @@ export type UseTeamAgentExecutionsResult = {
   hydrateLatestForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
 }
 
-export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
+export function useTeamAgentExecutions(
+  options?: UseTeamAgentExecutionsOptions
+): UseTeamAgentExecutionsResult {
+  const availableNotes = options?.availableNotes
   const [executionsByCard, setExecutionsByCard] = useState<Map<string, AgentExecutionRecord>>(
     () => new Map()
   )
@@ -106,11 +143,17 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
       if (!teamApi?.startExecution) {
         return null
       }
-      const execution = await teamApi.startExecution(request)
+      const linkedNotesContext =
+        request.linkedNotesContext ??
+        resolveLinkedNotesContext(request.card.linkedNoteIds, availableNotes)
+      const enrichedRequest: TeamStartExecutionRequest = linkedNotesContext
+        ? { ...request, linkedNotesContext }
+        : request
+      const execution = await teamApi.startExecution(enrichedRequest)
       recordExecution(execution)
       return execution
     },
-    [recordExecution]
+    [availableNotes, recordExecution]
   )
 
   const cancelExecution = useCallback(

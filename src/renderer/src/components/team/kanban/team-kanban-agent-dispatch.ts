@@ -2,6 +2,7 @@ import type {
   TeamKanbanAssignee,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { TeamLinkedNoteContext } from '../../../../../shared/teamwork/team-ipc-types'
 
 export function isDraggableAssigneeData(
   data: unknown
@@ -19,7 +20,10 @@ export function isDraggableAssigneeData(
   return hasValidType && hasValidName
 }
 
-export function buildAgentDispatchPrompt(card: TeamKanbanCard): {
+export function buildAgentDispatchPrompt(
+  card: TeamKanbanCard,
+  linkedNotes?: readonly TeamLinkedNoteContext[]
+): {
   prompt: string
   branchName: string
   agentName: string
@@ -37,6 +41,9 @@ export function buildAgentDispatchPrompt(card: TeamKanbanCard): {
   const checklist = card.checklist?.length
     ? `\n\n### Criterios de Aceptación:\n${card.checklist.map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n')}`
     : ''
+  const notesContext = linkedNotes?.length
+    ? `\n\n### Notas y ADRs Vinculados:\n${linkedNotes.map((n) => `#### ${n.title}\n${n.content}`).join('\n\n')}`
+    : ''
   const rules = [
     skills.includes('ponytail-5') || !skills.length
       ? `### Reglas Ponytail 5 (Minimum Complete Engineering):\n- YAGNI: Resuelve estrictamente el requerimiento sin abstracciones prematuras.\n- Reutilizar antes de reimplementar: Reutiliza componentes de @/components/ui/ y utilidades existentes.\n- Tipado estricto: CERO aserciones 'as' en código de producción.\n- Seguridad IME: Usa <Input>/<Textarea> o guarda Enter con !isImeOwnedKeyboardEvent(e).`
@@ -51,6 +58,6 @@ export function buildAgentDispatchPrompt(card: TeamKanbanCard): {
     card.assignee?.agentType === 'opencode'
       ? `opencode run --model "${model}" "${card.title}"`
       : `agy run --model "${model}" "${card.title}"`
-  const prompt = `# Tarea: ${card.title}\n\n**Agente:** ${agentName} (${model})\n**Rama:** ${branchName}\n\n## Descripción:\n${card.description || 'Sin descripción adicional.'}${checklist}\n\n${rules}\n\n\`\`\`bash\n${cli}\n\`\`\``
+  const prompt = `# Tarea: ${card.title}\n\n**Agente:** ${agentName} (${model})\n**Rama:** ${branchName}\n\n## Descripción:\n${card.description || 'Sin descripción adicional.'}${checklist}${notesContext}\n\n${rules}\n\n\`\`\`bash\n${cli}\n\`\`\``
   return { prompt, branchName, agentName }
 }

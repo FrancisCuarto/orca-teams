@@ -2,7 +2,8 @@ import { arrayMove } from '@dnd-kit/sortable'
 import type {
   TeamKanbanAssignee,
   TeamKanbanBoard,
-  TeamKanbanCard
+  TeamKanbanCard,
+  TeamWhiteboardItem
 } from '../../../../../shared/teamwork/team-kanban-types'
 import type { TeamReviewRequest } from '../../../../../shared/teamwork/team-workspace-types'
 
@@ -320,6 +321,100 @@ export function applyReviewRequestToKanbanCard(
   }
 
   return { nextBoard, movedToDone }
+}
+
+export function isConvertibleWhiteboardElement(item: TeamWhiteboardItem): boolean {
+  if (item.type === 'sticky' || item.type === 'text' || item.type === 'spec') {
+    return Boolean(item.title?.trim() || item.content.trim())
+  }
+  if (item.type === 'shape') {
+    return item.content.trim().length > 0
+  }
+  return false
+}
+
+function buildCardTitleAndDescriptionFromWhiteboardItem(item: TeamWhiteboardItem): {
+  title: string
+  description: string
+} {
+  const trimmedTitle = item.title?.trim() ?? ''
+  const trimmedContent = item.content.trim()
+  const contentLines = trimmedContent
+    .split('\n')
+    .map((line) => line.replace(/^#+\s*/, '').trim())
+    .filter(Boolean)
+
+  if (trimmedTitle) {
+    return {
+      title: trimmedTitle,
+      description: trimmedContent || `Convertida desde elemento de pizarra (${item.type}).`
+    }
+  }
+
+  const firstLine = contentLines[0] ?? `Elemento de pizarra (${item.type})`
+  const title = firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine
+  return {
+    title,
+    description: trimmedContent
+  }
+}
+
+export function convertWhiteboardElementsToBoard(
+  board: TeamKanbanBoard,
+  elements: readonly TeamWhiteboardItem[],
+  targetColumnId?: string
+): {
+  nextBoard: TeamKanbanBoard
+  createdCount: number
+  skippedDuplicateCount: number
+  createdCards: TeamKanbanCard[]
+} {
+  const destinationColumnId =
+    targetColumnId && board.columns.some((col) => col.id === targetColumnId)
+      ? targetColumnId
+      : (board.columns[0]?.id ?? 'col-backlog')
+
+  const existingSourceIds = new Set(
+    Object.values(board.cards)
+      .map((card) => card.sourceWhiteboardElementId)
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+  )
+
+  let nextBoard = board
+  let createdCount = 0
+  let skippedDuplicateCount = 0
+  const createdCards: TeamKanbanCard[] = []
+  const baseTime = Date.now()
+
+  for (const [idx, item] of elements.entries()) {
+    if (!isConvertibleWhiteboardElement(item)) {
+      continue
+    }
+    if (existingSourceIds.has(item.id)) {
+      skippedDuplicateCount += 1
+      continue
+    }
+    existingSourceIds.add(item.id)
+    createdCount += 1
+
+    const { title, description } = buildCardTitleAndDescriptionFromWhiteboardItem(item)
+    const newCard: TeamKanbanCard = {
+      id: `card-wb-${baseTime}-${idx}`,
+      title,
+      description,
+      columnId: destinationColumnId,
+      priority: 'medium',
+      labels: ['Desde Pizarra'],
+      checklist: [],
+      sourceWhiteboardElementId: item.id,
+      createdAt: baseTime + idx,
+      updatedAt: baseTime + idx
+    }
+    nextBoard = upsertKanbanCard(nextBoard, newCard).nextBoard
+    createdCards.push(newCard)
+  }
+
+  return { nextBoard, createdCount, skippedDuplicateCount, createdCards }
 }
 
 export function computeBoardSprintMetrics(board: TeamKanbanBoard): BoardSprintMetrics {

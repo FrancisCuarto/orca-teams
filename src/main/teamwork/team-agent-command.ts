@@ -128,7 +128,7 @@ export function extractCardAgentAssignment(
 }
 
 export function buildKanbanAgentPrompt(req: TeamStartExecutionRequest): string {
-  const { card, sprintGoal, followUpPrompt } = req
+  const { card, sprintGoal, followUpPrompt, linkedNotesContext } = req
   const { skills } = extractCardAgentAssignment(card, req.targetAgentId)
   const sections: string[] = [
     `# Tarea Kanban: ${card.title}`,
@@ -147,6 +147,20 @@ export function buildKanbanAgentPrompt(req: TeamStartExecutionRequest): string {
   if (card.checklist.length > 0) {
     const items = card.checklist.map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n')
     sections.push(`## Criterios de Aceptación\n${items}`)
+  }
+  if (linkedNotesContext && linkedNotesContext.length > 0) {
+    const noteEntries = linkedNotesContext
+      .filter((note) => note.title.trim() || note.content.trim())
+      .map((note) => {
+        const heading = note.title.trim() || note.id
+        const body = note.content.trim() || 'Sin contenido.'
+        return `### ${heading}\n${body}`
+      })
+    if (noteEntries.length > 0) {
+      sections.push(
+        `## Notas y ADRs Vinculados (Contexto de Arquitectura)\n${noteEntries.join('\n\n')}`
+      )
+    }
   }
   if (followUpPrompt?.trim()) {
     sections.push(`## Seguimiento / Consulta Mencionada\n${followUpPrompt.trim()}`)

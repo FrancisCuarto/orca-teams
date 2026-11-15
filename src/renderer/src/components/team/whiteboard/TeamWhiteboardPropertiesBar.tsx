@@ -7,6 +7,7 @@ import type {
   WhiteboardFontSize,
   WhiteboardShapeKind
 } from '../../../../../shared/teamwork/team-kanban-types'
+import { isConvertibleWhiteboardElement } from '../kanban/team-kanban-board-mutations'
 import { resolveItemSwatch, WHITEBOARD_SWATCHES } from './whiteboard-types'
 
 const STROKE_WIDTHS = [2, 4, 6] as const
@@ -33,6 +34,7 @@ type Props = {
   onBringToFront: () => void
   onDelete: () => void
   onCreateTask?: () => void
+  onConvertToKanban?: () => void
 }
 
 export function TeamWhiteboardPropertiesBar({
@@ -41,7 +43,8 @@ export function TeamWhiteboardPropertiesBar({
   onDuplicate,
   onBringToFront,
   onDelete,
-  onCreateTask
+  onCreateTask,
+  onConvertToKanban
 }: Props): React.JSX.Element {
   const activeSwatch = resolveItemSwatch(item)
   const activeStrokeWidth = item.strokeWidth ?? (item.type === 'draw' ? 3 : 2)
@@ -49,7 +52,8 @@ export function TeamWhiteboardPropertiesBar({
   const activeFontSize = item.fontSize ?? 'sm'
   const supportsText =
     item.type === 'sticky' || item.type === 'text' || item.type === 'spec' || item.type === 'shape'
-  const supportsTask = item.type !== 'draw' && item.type !== 'arrow'
+  const canConvertToKanban = isConvertibleWhiteboardElement(item)
+  const convertAction = onConvertToKanban ?? onCreateTask
 
   return (
     <div
@@ -153,15 +157,15 @@ export function TeamWhiteboardPropertiesBar({
         <Button size="icon-xs" variant="ghost" onClick={onBringToFront} title="Traer al frente">
           <BringToFront className="size-3.5" />
         </Button>
-        {supportsTask && onCreateTask && (
+        {canConvertToKanban && convertAction && (
           <Button
             size="xs"
             variant="outline"
-            onClick={onCreateTask}
-            title="Crear tarea desde elemento"
+            onClick={convertAction}
+            title="Convertir elemento seleccionado en tarjeta Kanban"
           >
             <KanbanSquare className="size-3.5 text-git-graph-lane-2 mr-1" />
-            Crear Tarea
+            Convertir a tarjeta Kanban
           </Button>
         )}
         <Button size="icon-xs" variant="ghost" onClick={onDelete} title="Eliminar (Supr)">

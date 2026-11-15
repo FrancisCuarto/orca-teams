@@ -58,6 +58,8 @@ export type TeamKanbanCard = {
   labels: string[]
   checklist: TeamKanbanChecklistItem[]
   comments?: TeamCardComment[]
+  linkedNoteIds?: string[]
+  sourceWhiteboardElementId?: string
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean

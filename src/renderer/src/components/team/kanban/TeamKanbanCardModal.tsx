@@ -4,7 +4,8 @@ import type {
   TeamCardComment,
   TeamCommentMention,
   TeamKanbanCard,
-  TeamKanbanColumn
+  TeamKanbanColumn,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import type { TeamMemberEntry } from '../../../../../shared/teamwork/team-members'
 import {
@@ -29,6 +30,7 @@ type Props = {
   availableMembers?: ExtendedTeamMember[]
   readOnly?: boolean
   canDispatchAgents?: boolean
+  availableNotes?: TeamNote[]
   onClose: () => void
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
@@ -55,6 +57,7 @@ export function TeamKanbanCardModal({
   availableMembers,
   readOnly = false,
   canDispatchAgents = true,
+  availableNotes,
   onClose,
   onSave,
   onDelete,
@@ -91,6 +94,7 @@ export function TeamKanbanCardModal({
             availableMembers={availableMembers}
             readOnly={readOnly}
             canDispatchAgents={canDispatchAgents}
+            availableNotes={availableNotes}
             onClose={onClose}
             onSave={onSave}
             onDelete={onDelete}

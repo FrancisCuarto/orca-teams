@@ -82,6 +82,12 @@ export type TeamWorkspaceSnapshot = {
   projectMembersByProject?: Record<string, ProjectMember[]>
 }
 
+export type TeamLinkedNoteContext = {
+  id: string
+  title: string
+  content: string
+}
+
 export type TeamStartExecutionRequest = {
   card: TeamKanbanCard
   projectId: string
@@ -92,6 +98,7 @@ export type TeamStartExecutionRequest = {
   requiresApproval?: boolean
   followUpPrompt?: string
   targetAgentId?: string
+  linkedNotesContext?: TeamLinkedNoteContext[]
 }
 
 export type TeamAddCardCommentRequest = {

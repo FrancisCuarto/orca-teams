@@ -1,5 +1,8 @@
 import React from 'react'
-import type { TeamWhiteboard } from '../../../../../shared/teamwork/team-kanban-types'
+import type {
+  TeamWhiteboard,
+  TeamWhiteboardItem
+} from '../../../../../shared/teamwork/team-kanban-types'
 import {
   getTeamPermissions,
   type TeamPermissions
@@ -25,7 +28,8 @@ type Props = {
   syncToken?: string
   onPersist?: (wb: TeamWhiteboard) => void
   onPeersChange?: (peers: CollaboratorPresence[]) => void
-  onCreateTask?: (item: TeamWhiteboard['items'][number]) => void
+  onCreateTask?: (item: TeamWhiteboardItem) => void
+  onConvertToKanban?: (items: readonly TeamWhiteboardItem[]) => void
 }
 
 export function TeamWhiteboardConnectedView({
@@ -39,7 +43,8 @@ export function TeamWhiteboardConnectedView({
   syncToken,
   onPersist,
   onPeersChange,
-  onCreateTask
+  onCreateTask,
+  onConvertToKanban
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
   const { whiteboard, peers, remoteCursors, syncWhiteboard, broadcastCursor } =
@@ -68,6 +73,7 @@ export function TeamWhiteboardConnectedView({
         }
       }}
       onCreateTask={resolvedPermissions.canEditBoard ? onCreateTask : undefined}
+      onConvertToKanban={resolvedPermissions.canEditBoard ? onConvertToKanban : undefined}
     />
   )
 }

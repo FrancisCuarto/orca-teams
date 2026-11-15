@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import type {
   ExtendedTeamMember,
-  TeamKanbanBoard
+  TeamKanbanBoard,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import {
   getTeamPermissions,
@@ -26,6 +27,7 @@ type Props = {
   userRole?: TeamRole
   permissions?: TeamPermissions
   humanMembers?: ExtendedTeamMember[]
+  availableNotes?: TeamNote[]
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
@@ -40,6 +42,7 @@ export function TeamKanbanConnectedView({
   userRole = 'owner',
   permissions,
   humanMembers,
+  availableNotes,
   relayUrl,
   syncToken,
   onPersist,
@@ -94,6 +97,7 @@ export function TeamKanbanConnectedView({
         permissions={resolvedPermissions}
         humanMembers={humanMembers}
         peers={peers}
+        availableNotes={availableNotes}
         onActiveCardChange={updateActiveCard}
         onAddCardComment={addCardComment}
         onDeleteCardComment={deleteCardComment}

@@ -20,6 +20,8 @@ export type CardFormDraftInput = {
   agentSkills: string[]
   labelsText: string
   checklist: TeamKanbanChecklistItem[]
+  linkedNoteIds?: string[]
+  sourceWhiteboardElementId?: string
   estimatePoints?: number
   branchOrWorktree: string
   isolateWorktree: boolean
@@ -33,6 +35,15 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
     .split(',')
     .map((l) => l.trim())
     .filter(Boolean)
+
+  const rawLinkedNoteIds = input.linkedNoteIds ?? existingCard?.linkedNoteIds ?? []
+  const linkedNoteIds = Array.from(
+    new Set(rawLinkedNoteIds.map((id) => id.trim()).filter(Boolean))
+  )
+  const sourceWhiteboardElementId =
+    input.sourceWhiteboardElementId?.trim() ||
+    existingCard?.sourceWhiteboardElementId?.trim() ||
+    undefined
 
   const resolvedAgentType =
     assigneeType === 'agent'
@@ -64,6 +75,8 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
     labels,
     checklist: input.checklist,
     ...(existingCard?.comments ? { comments: existingCard.comments } : {}),
+    ...(linkedNoteIds.length > 0 ? { linkedNoteIds } : {}),
+    ...(sourceWhiteboardElementId ? { sourceWhiteboardElementId } : {}),
     estimatePoints: input.estimatePoints,
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
     isolateWorktree: input.isolateWorktree,

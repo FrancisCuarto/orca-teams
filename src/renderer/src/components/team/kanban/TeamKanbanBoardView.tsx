@@ -5,7 +5,8 @@ import type {
   ExtendedTeamMember,
   TeamCardComment,
   TeamKanbanBoard,
-  TeamKanbanCard
+  TeamKanbanCard,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { TeamFactoryConfigModal } from '../factory/TeamFactoryConfigModal'
 import { TeamFactoryRunModal } from '../factory/TeamFactoryRunModal'
@@ -48,6 +49,7 @@ type Props = {
   onDeleteCardComment?: (commentId: string) => void
   peers?: CollaboratorPresence[]
   onActiveCardChange?: (cardId?: string) => void
+  availableNotes?: TeamNote[]
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -64,6 +66,7 @@ export function TeamKanbanBoardView({
   onDeleteCardComment,
   peers,
   onActiveCardChange,
+  availableNotes,
   onChange
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
@@ -96,7 +99,7 @@ export function TeamKanbanBoardView({
     getExecutionDiff,
     requestExecutionChanges,
     hydrateLatestForCard
-  } = useTeamAgentExecutions()
+  } = useTeamAgentExecutions({ availableNotes })
   const factory = useTeamFactory(resolvedProjectId)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -120,6 +123,7 @@ export function TeamKanbanBoardView({
     canEditBoard,
     canDispatchAgents,
     configuredAgents,
+    availableNotes,
     executionsByCard,
     startCardExecution,
     hydrateLatestForCard,
@@ -464,6 +468,7 @@ export function TeamKanbanBoardView({
         availableMembers={board.customMembers}
         readOnly={isReadOnly}
         canDispatchAgents={canDispatchAgents}
+        availableNotes={availableNotes}
         onClose={() => {
           setIsModalOpen(false)
           onActiveCardChange?.(undefined)

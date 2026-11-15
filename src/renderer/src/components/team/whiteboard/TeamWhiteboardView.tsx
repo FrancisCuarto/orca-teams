@@ -29,6 +29,7 @@ type Props = {
   onCursorMove?: (x: number, y: number) => void
   onChange: (updated: TeamWhiteboard) => void
   onCreateTask?: (item: TeamWhiteboardItem) => void
+  onConvertToKanban?: (items: readonly TeamWhiteboardItem[]) => void
 }
 
 const EMPTY_CURSORS: WhiteboardCursorPresence[] = []
@@ -44,7 +45,8 @@ export function TeamWhiteboardView({
   canCreateTask = true,
   onCursorMove,
   onChange,
-  onCreateTask
+  onCreateTask,
+  onConvertToKanban
 }: Props): React.JSX.Element {
   const isDark = useDocumentDarkTheme()
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -304,6 +306,17 @@ export function TeamWhiteboardView({
             canCreateTask
               ? () => {
                   void actions.createTaskForItem(selectedItem)
+                }
+              : undefined
+          }
+          onConvertToKanban={
+            canCreateTask
+              ? () => {
+                  if (onConvertToKanban) {
+                    onConvertToKanban([selectedItem])
+                  } else {
+                    void actions.createTaskForItem(selectedItem)
+                  }
                 }
               : undefined
           }
