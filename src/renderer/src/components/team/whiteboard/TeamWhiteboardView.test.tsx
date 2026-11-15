@@ -193,4 +193,35 @@ describe('TeamWhiteboardView Pro', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /crear tarea/i })[0])
     expect(onCreateTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'card-a' }))
   })
+
+  it('muestra Convertir a tarjeta Kanban para sticky/texto/forma con texto y lo oculta en formas vacías', () => {
+    const wb = createSampleBoard()
+    wb.items.push({
+      id: 'shape-empty',
+      type: 'shape',
+      shapeKind: 'rect',
+      content: '',
+      x: 50,
+      y: 350,
+      width: 140,
+      height: 80
+    })
+    const onConvertToKanban = vi.fn()
+
+    render(
+      <TeamWhiteboardView
+        whiteboard={wb}
+        onChange={vi.fn()}
+        onConvertToKanban={onConvertToKanban}
+      />
+    )
+
+    fireEvent.mouseDown(screen.getByTestId('whiteboard-item-card-b'))
+    const convertBtn = screen.getByRole('button', { name: /convertir a tarjeta kanban/i })
+    fireEvent.click(convertBtn)
+    expect(onConvertToKanban).toHaveBeenCalledWith([expect.objectContaining({ id: 'card-b' })])
+
+    fireEvent.mouseDown(screen.getByTestId('whiteboard-item-shape-empty'))
+    expect(screen.queryByRole('button', { name: /convertir a tarjeta kanban/i })).toBeNull()
+  })
 })

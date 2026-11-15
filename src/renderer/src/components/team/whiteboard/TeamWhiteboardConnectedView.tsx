@@ -1,5 +1,8 @@
 import React from 'react'
-import type { TeamWhiteboard } from '../../../../../shared/teamwork/team-kanban-types'
+import type {
+  TeamWhiteboard,
+  TeamWhiteboardItem
+} from '../../../../../shared/teamwork/team-kanban-types'
 import { useTeamWhiteboardSync } from '../hooks/use-team-whiteboard-sync'
 import { TeamWhiteboardView } from './TeamWhiteboardView'
 
@@ -16,7 +19,8 @@ type Props = {
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (wb: TeamWhiteboard) => void
-  onCreateTask?: (item: TeamWhiteboard['items'][number]) => void
+  onCreateTask?: (item: TeamWhiteboardItem) => void
+  onConvertToKanban?: (items: readonly TeamWhiteboardItem[]) => void
 }
 
 export function TeamWhiteboardConnectedView({
@@ -27,7 +31,8 @@ export function TeamWhiteboardConnectedView({
   relayUrl,
   syncToken,
   onPersist,
-  onCreateTask
+  onCreateTask,
+  onConvertToKanban
 }: Props): React.JSX.Element {
   const { whiteboard, remoteCursors, syncWhiteboard, broadcastCursor } = useTeamWhiteboardSync({
     whiteboardId,
@@ -48,6 +53,7 @@ export function TeamWhiteboardConnectedView({
         syncWhiteboard(updated)
       }}
       onCreateTask={onCreateTask}
+      onConvertToKanban={onConvertToKanban}
     />
   )
 }

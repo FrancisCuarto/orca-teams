@@ -79,6 +79,12 @@ export type TeamWorkspaceSnapshot = {
   invitationsByTeam: Record<string, TeamInvitation[]>
 }
 
+export type TeamLinkedNoteContext = {
+  id: string
+  title: string
+  content: string
+}
+
 export type TeamStartExecutionRequest = {
   card: TeamKanbanCard
   projectId: string
@@ -87,6 +93,7 @@ export type TeamStartExecutionRequest = {
   sprintGoal?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
+  linkedNotesContext?: TeamLinkedNoteContext[]
 }
 
 export type TeamExecutionEvent =

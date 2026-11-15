@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import type {
   ExtendedTeamMember,
   TeamKanbanBoard,
-  TeamKanbanCard
+  TeamKanbanCard,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
@@ -27,6 +28,7 @@ type Props = {
   currentUserId?: string
   currentUserName?: string
   humanMembers?: ExtendedTeamMember[]
+  availableNotes?: TeamNote[]
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -37,6 +39,7 @@ export function TeamKanbanBoardView({
   currentUserId = 'usr-francis',
   currentUserName,
   humanMembers,
+  availableNotes,
   onChange
 }: Props): React.JSX.Element {
   const [editingCard, setEditingCard] = useState<TeamKanbanCard | null>(null)
@@ -57,7 +60,7 @@ export function TeamKanbanBoardView({
     approveExecution,
     rejectExecution,
     hydrateLatestForCard
-  } = useTeamAgentExecutions()
+  } = useTeamAgentExecutions({ availableNotes })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const cardMap = useMemo(() => board.cards, [board.cards])
@@ -70,6 +73,7 @@ export function TeamKanbanBoardView({
     projectPath,
     actorUserId: currentUserId,
     configuredAgents,
+    availableNotes,
     executionsByCard,
     startCardExecution,
     hydrateLatestForCard,
@@ -179,6 +183,7 @@ export function TeamKanbanBoardView({
         configuredAgents={configuredAgents}
         humanMembers={humanMembers}
         availableMembers={board.customMembers}
+        availableNotes={availableNotes}
         onClose={() => setIsModalOpen(false)}
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}

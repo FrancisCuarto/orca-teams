@@ -131,6 +131,53 @@ describe('TeamBoardCRDT', () => {
     expect(boardA.cards['card-1'].id).toBe(boardB.cards['card-1'].id)
     expect(boardA.columns).toEqual(boardB.columns)
   })
+
+  it('preserva y sincroniza linkedNoteIds y sourceWhiteboardElementId entre peers', () => {
+    const seed = createSampleBoard()
+    const clientA = new TeamBoardCRDT('board-alpha')
+    clientA.initializeFromBoard(seed)
+
+    const clientB = new TeamBoardCRDT('board-alpha')
+    clientB.applyUpdate(clientA.encodeStateAsUpdate())
+
+    const cardWithContext: TeamKanbanCard = {
+      id: 'card-wb-1',
+      title: 'Implementar Auth Gateway',
+      description: 'Desde pizarra',
+      columnId: 'col-todo',
+      priority: 'high',
+      labels: ['Desde Pizarra'],
+      checklist: [],
+      linkedNoteIds: ['note-adr-001', 'note-spec-001'],
+      sourceWhiteboardElementId: 'wb-item-42',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+
+    clientA.upsertCard(cardWithContext)
+    clientB.applyUpdate(clientA.encodeStateAsUpdate())
+
+    const syncedCard = clientB.getBoard().cards['card-wb-1']
+    expect(syncedCard).toBeDefined()
+    if (!syncedCard) {
+      throw new Error('Expected card-wb-1 to exist on clientB')
+    }
+    expect(syncedCard.linkedNoteIds).toEqual(['note-adr-001', 'note-spec-001'])
+    expect(syncedCard.sourceWhiteboardElementId).toBe('wb-item-42')
+
+    // Actualizar tarjeta quitando una nota vinculada, preservando sourceWhiteboardElementId
+    clientB.upsertCard({
+      ...syncedCard,
+      linkedNoteIds: ['note-adr-001']
+    })
+    clientA.applyUpdate(clientB.encodeStateAsUpdate())
+
+    expect(clientA.getBoard().cards['card-wb-1']?.linkedNoteIds).toEqual(['note-adr-001'])
+    expect(clientA.getBoard().cards['card-wb-1']?.sourceWhiteboardElementId).toBe('wb-item-42')
+
+    clientA.destroy()
+    clientB.destroy()
+  })
 })
 
 describe('TeamRoomProvider', () => {

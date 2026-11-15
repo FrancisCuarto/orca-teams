@@ -4,7 +4,8 @@ import type {
   ExtendedTeamMember,
   TeamKanbanCard,
   TeamKanbanColumn,
-  TeamKanbanPriority
+  TeamKanbanPriority,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import {
   DEFAULT_TEAM_HUMAN_MEMBERS,
@@ -27,6 +28,7 @@ export type TeamKanbanCardFormProps = {
   configuredAgents?: TeamMemberEntry[]
   humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
+  availableNotes?: TeamNote[]
   onClose: () => void
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
@@ -34,6 +36,7 @@ export type TeamKanbanCardFormProps = {
 }
 
 const EMPTY_AGENTS: TeamMemberEntry[] = []
+const EMPTY_NOTES: TeamNote[] = []
 
 export function TeamKanbanCardForm({
   card,
@@ -42,6 +45,7 @@ export function TeamKanbanCardForm({
   configuredAgents = EMPTY_AGENTS,
   humanMembers,
   availableMembers,
+  availableNotes = EMPTY_NOTES,
   onClose,
   onSave,
   onDelete,
@@ -63,6 +67,9 @@ export function TeamKanbanCardForm({
   )
   const [labelsText, setLabelsText] = useState(card?.labels?.join(', ') ?? '')
   const [checklist, setChecklist] = useState(card?.checklist ? [...card.checklist] : [])
+  const [linkedNoteIds, setLinkedNoteIds] = useState<string[]>(
+    card?.linkedNoteIds ? [...card.linkedNoteIds] : []
+  )
   const [estimatePoints, setEstimatePoints] = useState<number | undefined>(card?.estimatePoints)
   const [branchOrWorktree, setBranchOrWorktree] = useState(card?.branchOrWorktree ?? '')
   const [isolateWorktree, setIsolateWorktree] = useState(card?.isolateWorktree ?? true)
@@ -141,6 +148,7 @@ export function TeamKanbanCardForm({
       agentSkills,
       labelsText,
       checklist,
+      linkedNoteIds,
       estimatePoints,
       branchOrWorktree,
       isolateWorktree,
@@ -210,6 +218,8 @@ export function TeamKanbanCardForm({
           blockedReason={blockedReason}
           labelsText={labelsText}
           description={description}
+          availableNotes={availableNotes}
+          linkedNoteIds={linkedNoteIds}
           onColumnChange={setColumnId}
           onPriorityChange={setPriority}
           onEstimatePointsChange={setEstimatePoints}
@@ -219,6 +229,12 @@ export function TeamKanbanCardForm({
           onBlockedReasonChange={setBlockedReason}
           onLabelsTextChange={setLabelsText}
           onDescriptionChange={setDescription}
+          onAttachNote={(noteId) =>
+            setLinkedNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]))
+          }
+          onDetachNote={(noteId) =>
+            setLinkedNoteIds((prev) => prev.filter((id) => id !== noteId))
+          }
         />
 
         <TeamKanbanCardChecklist

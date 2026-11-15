@@ -95,7 +95,16 @@ export class TeamAgentRunner {
           timestamp: now,
           level: 'info',
           message: `Tarea encolada para ${agentId} (${command}).`
-        }
+        },
+        ...(req.linkedNotesContext && req.linkedNotesContext.length > 0
+          ? [
+              {
+                timestamp: now,
+                level: 'info' as const,
+                message: `Contexto inyectado desde ${req.linkedNotesContext.length} ${req.linkedNotesContext.length === 1 ? 'nota/ADR vinculada' : 'notas/ADRs vinculadas'}.`
+              }
+            ]
+          : [])
       ],
       idempotencyKey: `${req.card.id}-${executionId}`,
       createdAt: now,

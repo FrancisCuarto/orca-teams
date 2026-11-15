@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import type {
   ExtendedTeamMember,
-  TeamKanbanBoard
+  TeamKanbanBoard,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import { useTeamKanbanSync } from '../hooks/use-team-kanban-sync'
 import { TeamBoardPresenceBar } from './TeamBoardPresenceBar'
@@ -18,6 +19,7 @@ type Props = {
     color?: string
   }
   humanMembers?: ExtendedTeamMember[]
+  availableNotes?: TeamNote[]
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
@@ -29,6 +31,7 @@ export function TeamKanbanConnectedView({
   initialBoard,
   currentUser,
   humanMembers,
+  availableNotes,
   relayUrl,
   syncToken,
   onPersist
@@ -68,6 +71,7 @@ export function TeamKanbanConnectedView({
         currentUserId={currentUser.userId}
         currentUserName={currentUser.displayName}
         humanMembers={humanMembers}
+        availableNotes={availableNotes}
         onChange={syncBoard}
       />
     </div>

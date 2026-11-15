@@ -2,7 +2,12 @@ import { spawn } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import type { TeamKanbanCard } from '../../shared/teamwork/team-kanban-types'
 import type { TeamExecutionEvent } from '../../shared/teamwork/team-ipc-types'
-import { buildAgentCliCommand, resolveAgentCommand, TeamAgentRunner } from './team-agent-runner'
+import {
+  buildAgentCliCommand,
+  buildKanbanAgentPrompt,
+  resolveAgentCommand,
+  TeamAgentRunner
+} from './team-agent-runner'
 
 function makeCard(overrides: Partial<TeamKanbanCard> = {}): TeamKanbanCard {
   return {
@@ -136,6 +141,55 @@ describe('team-agent-runner', () => {
     )
     const cancelled = runner.cancelExecution(rec.id)
     expect(cancelled?.status).toBe('cancelled')
+    runner.dispose()
+  })
+
+  it('injects linkedNotesContext into prompt and logs attached notes count', async () => {
+    const prompt = buildKanbanAgentPrompt({
+      card: makeCard({ linkedNoteIds: ['note-adr-001'] }),
+      projectId: 'proj-1',
+      actorUserId: 'usr-1',
+      linkedNotesContext: [
+        {
+          id: 'note-adr-001',
+          title: 'ADR-001: Almacenamiento Git-Backed',
+          content: 'Persistir todo bajo .orca/team/'
+        }
+      ]
+    })
+
+    expect(prompt).toContain('## Notas y ADRs Vinculados (Contexto de Arquitectura)')
+    expect(prompt).toContain('### ADR-001: Almacenamiento Git-Backed')
+    expect(prompt).toContain('Persistir todo bajo .orca/team/')
+
+    const runner = new TeamAgentRunner({
+      hydrateShellPath: async () => undefined,
+      resolveExecutable: async () => process.execPath,
+      spawnProcess: (_bin, _args, opts) =>
+        spawn(process.execPath, ['-e', "console.log('ok')"], {
+          cwd: opts.cwd,
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+    })
+
+    const rec = await runner.startExecution(
+      {
+        card: makeCard({ id: 'card-notes', linkedNoteIds: ['note-adr-001'] }),
+        projectId: 'proj-1',
+        actorUserId: 'usr-1',
+        linkedNotesContext: [
+          {
+            id: 'note-adr-001',
+            title: 'ADR-001: Almacenamiento Git-Backed',
+            content: 'Persistir todo bajo .orca/team/'
+          }
+        ]
+      },
+      () => undefined
+    )
+
+    expect(rec.prompt).toContain('ADR-001: Almacenamiento Git-Backed')
+    expect(rec.logs.some((l) => l.message.includes('1 nota/ADR vinculada'))).toBe(true)
     runner.dispose()
   })
 })

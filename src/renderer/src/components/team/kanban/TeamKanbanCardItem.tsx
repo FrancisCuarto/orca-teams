@@ -1,7 +1,14 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, CheckSquare, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  GitBranch
+} from 'lucide-react'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
@@ -57,6 +64,7 @@ export function TeamKanbanCardItem({
   const priority = PRIORITY_STYLES[card.priority] ?? PRIORITY_STYLES.medium
   const completedChecklist = card.checklist?.filter((item) => item.done).length ?? 0
   const totalChecklist = card.checklist?.length ?? 0
+  const linkedNotesCount = card.linkedNoteIds?.length ?? 0
 
   return (
     <div
@@ -82,6 +90,17 @@ export function TeamKanbanCardItem({
           {card.estimatePoints !== undefined && card.estimatePoints !== null ? (
             <Badge variant="outline" className="font-mono text-3xs px-1.5 py-0 h-4">
               {card.estimatePoints} pts
+            </Badge>
+          ) : null}
+
+          {linkedNotesCount > 0 ? (
+            <Badge
+              variant="outline"
+              className="text-3xs px-1.5 py-0 h-4 gap-1 text-primary border-primary/30"
+              title={`${linkedNotesCount} ${linkedNotesCount === 1 ? 'nota/ADR vinculada' : 'notas/ADRs vinculadas'}`}
+            >
+              <FileText className="size-2.5" />
+              {linkedNotesCount}
             </Badge>
           ) : null}
         </div>

@@ -1,10 +1,15 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { Activity, FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
+import type {
+  TeamNote,
+  TeamTab,
+  TeamWhiteboardItem
+} from '../../../../shared/teamwork/team-kanban-types'
 import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
 import {
   computeBoardSprintMetrics,
+  convertWhiteboardElementsToBoard,
   extractActionItemsFromMarkdownToBoard
 } from './kanban/team-kanban-board-mutations'
 import { TeamActivityView } from './activity/TeamActivityView'
@@ -18,6 +23,8 @@ import { useActiveRepo } from '@/store/repos/use-repository-catalog'
 import { useTeamSyncAndAuth } from './hooks/use-team-sync-and-auth'
 import { useTeamWorkspaceData } from './hooks/use-team-workspace-data'
 import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
+
+const EMPTY_NOTES: TeamNote[] = []
 
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
@@ -96,6 +103,32 @@ export default function TeamPage(): React.JSX.Element {
       toast.success(
         `${createdCount} ${createdCount === 1 ? 'tarea extraída' : 'tareas extraídas'} al Kanban`,
         { description: `Origen: ${noteTitle}` }
+      )
+    },
+    [board, handleBoardChange]
+  )
+
+  const handleConvertWhiteboardToKanban = useCallback(
+    (elements: readonly TeamWhiteboardItem[]) => {
+      if (!board) {
+        return
+      }
+      const { nextBoard, createdCount, skippedDuplicateCount, createdCards } =
+        convertWhiteboardElementsToBoard(board, elements)
+      if (createdCount === 0) {
+        if (skippedDuplicateCount > 0) {
+          toast.info('Este elemento de pizarra ya tiene una tarjeta creada en el Kanban')
+        } else {
+          toast.info('El elemento seleccionado no contiene texto convertible a tarjeta Kanban')
+        }
+        return
+      }
+      handleBoardChange(nextBoard)
+      setActiveTab('kanban')
+      const originLabel = createdCards[0]?.title
+      toast.success(
+        `${createdCount} ${createdCount === 1 ? 'tarjeta creada' : 'tarjetas creadas'} en el Kanban`,
+        originLabel ? { description: `Origen: ${originLabel}` } : undefined
       )
     },
     [board, handleBoardChange]
@@ -198,6 +231,7 @@ export default function TeamPage(): React.JSX.Element {
             initialBoard={board}
             currentUser={{ ...currentUserIdentity, color: '#3b82f6' }}
             humanMembers={registry.humanMembers}
+            availableNotes={notes?.notes ?? EMPTY_NOTES}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleBoardChange}
@@ -212,6 +246,8 @@ export default function TeamPage(): React.JSX.Element {
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleWhiteboardChange}
+            onConvertToKanban={handleConvertWhiteboardToKanban}
+            onCreateTask={(item) => handleConvertWhiteboardToKanban([item])}
           />
         ) : activeTab === 'notes' && notes ? (
           <TeamNotesConnectedView

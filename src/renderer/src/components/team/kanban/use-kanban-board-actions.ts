@@ -3,11 +3,13 @@ import { toast } from 'sonner'
 import type {
   TeamKanbanAssignee,
   TeamKanbanBoard,
-  TeamKanbanCard
+  TeamKanbanCard,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import type { TeamMemberEntry } from '../../../../../shared/teamwork/team-members'
 import type { TeamStartExecutionRequest } from '../../../../../shared/teamwork/team-ipc-types'
 import type { AgentExecutionRecord } from '../../../../../shared/teamwork/team-workspace-types'
+import { resolveLinkedNotesContext } from '../hooks/use-team-agent-executions'
 import { copyTextToClipboard } from '../utils/team-clipboard'
 import { buildAgentDispatchPrompt } from './team-kanban-agent-dispatch'
 import {
@@ -28,6 +30,7 @@ type Options = {
   projectPath?: string | null
   actorUserId: string
   configuredAgents: readonly TeamMemberEntry[]
+  availableNotes?: readonly TeamNote[]
   executionsByCard: Map<string, AgentExecutionRecord>
   startCardExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord | null>
   hydrateLatestForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
@@ -42,6 +45,7 @@ export function useKanbanBoardActions(options: Options) {
     projectPath,
     actorUserId,
     configuredAgents,
+    availableNotes,
     executionsByCard,
     startCardExecution,
     hydrateLatestForCard,
@@ -57,6 +61,10 @@ export function useKanbanBoardActions(options: Options) {
         return
       }
       const resolvedCard = resolveCardForConfiguredAgent(card, configuredAgents)
+      const linkedNotesContext = resolveLinkedNotesContext(
+        resolvedCard.linkedNoteIds,
+        availableNotes
+      )
       const agentName = resolvedCard.assignee?.name ?? 'Agente IA'
       try {
         const record = await startCardExecution({
@@ -66,14 +74,15 @@ export function useKanbanBoardActions(options: Options) {
           actorUserId,
           sprintGoal: board.sprintGoal,
           isolateWorktree: resolvedCard.isolateWorktree,
-          requiresApproval: resolvedCard.requiresApproval
+          requiresApproval: resolvedCard.requiresApproval,
+          ...(linkedNotesContext ? { linkedNotesContext } : {})
         })
         if (record) {
           onOpenExecutionModal(resolvedCard.id)
           toast.info(`Agente ${agentName} ejecutando: ${resolvedCard.title}`)
           return
         }
-        const { prompt } = buildAgentDispatchPrompt(resolvedCard)
+        const { prompt } = buildAgentDispatchPrompt(resolvedCard, linkedNotesContext)
         await copyTextToClipboard(prompt)
         toast.warning('Runtime de ejecución no disponible; prompt copiado al portapapeles')
       } catch (err) {
@@ -84,6 +93,7 @@ export function useKanbanBoardActions(options: Options) {
     },
     [
       configuredAgents,
+      availableNotes,
       startCardExecution,
       projectId,
       projectPath,

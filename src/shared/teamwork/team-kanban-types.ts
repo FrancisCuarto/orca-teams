@@ -33,6 +33,8 @@ export type TeamKanbanCard = {
   assignee?: TeamKanbanAssignee
   labels: string[]
   checklist: TeamKanbanChecklistItem[]
+  linkedNoteIds?: string[]
+  sourceWhiteboardElementId?: string
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean

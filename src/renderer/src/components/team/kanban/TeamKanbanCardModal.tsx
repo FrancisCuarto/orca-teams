@@ -2,7 +2,8 @@ import React from 'react'
 import type {
   ExtendedTeamMember,
   TeamKanbanCard,
-  TeamKanbanColumn
+  TeamKanbanColumn,
+  TeamNote
 } from '../../../../../shared/teamwork/team-kanban-types'
 import type { TeamMemberEntry } from '../../../../../shared/teamwork/team-members'
 import {
@@ -22,6 +23,7 @@ type Props = {
   configuredAgents?: TeamMemberEntry[]
   humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
+  availableNotes?: TeamNote[]
   onClose: () => void
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
@@ -36,6 +38,7 @@ export function TeamKanbanCardModal({
   configuredAgents,
   humanMembers,
   availableMembers,
+  availableNotes,
   onClose,
   onSave,
   onDelete,
@@ -61,6 +64,7 @@ export function TeamKanbanCardModal({
             configuredAgents={configuredAgents}
             humanMembers={humanMembers}
             availableMembers={availableMembers}
+            availableNotes={availableNotes}
             onClose={onClose}
             onSave={onSave}
             onDelete={onDelete}
