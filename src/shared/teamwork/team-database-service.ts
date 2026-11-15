@@ -15,19 +15,23 @@ import {
 } from './team-workspace-types'
 import { teamSchemaStatements } from './team-schema'
 import { TeamActivityService } from './team-activity-service'
+import { TeamCommentService, type AddCardCommentInput } from './team-comment-service'
 import { TeamExecutionService } from './team-execution-service'
 import { TeamInvitationService } from './team-invitation-service'
+import type { TeamCardComment } from './team-kanban-types'
 import { TeamProjectService } from './team-project-service'
 import { mapTeamRow } from './team-row-mappers'
 
 export class TeamDatabaseService {
   private readonly activity: TeamActivityService
+  private readonly comments: TeamCommentService
   private readonly executions: TeamExecutionService
   private readonly invitations: TeamInvitationService
   private readonly projects: TeamProjectService
 
   constructor(private readonly db: DatabaseSync) {
     this.activity = new TeamActivityService(db)
+    this.comments = new TeamCommentService(db)
     this.executions = new TeamExecutionService(db)
     this.invitations = new TeamInvitationService(db, (t, u) => this.getTeamMemberRole(t, u))
     this.projects = new TeamProjectService(db, (t, u) => this.getTeamMemberRole(t, u))
@@ -268,5 +272,19 @@ export class TeamDatabaseService {
     limit?: number
   }): TeamActivityEntry[] {
     return this.activity.listActivity(options)
+  }
+
+  // --- Comentarios de Tarjetas (Comments) - Delegación a TeamCommentService ---
+
+  listCardComments(cardId: string): TeamCardComment[] {
+    return this.comments.listCardComments(cardId)
+  }
+
+  addCardComment(input: AddCardCommentInput): TeamCardComment {
+    return this.comments.addCardComment(input)
+  }
+
+  deleteCardComment(commentId: string): boolean {
+    return this.comments.deleteCardComment(commentId)
   }
 }

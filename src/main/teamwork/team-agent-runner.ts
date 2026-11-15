@@ -72,7 +72,7 @@ export class TeamAgentRunner {
     req: TeamStartExecutionRequest,
     onEvent: (event: TeamExecutionEvent) => void
   ): Promise<AgentExecutionRecord> {
-    const { agentId, model } = extractCardAgentAssignment(req.card)
+    const { agentId, model } = extractCardAgentAssignment(req.card, req.targetAgentId)
     const command = resolveAgentCommand(agentId)
     const prompt = buildKanbanAgentPrompt(req)
     const now = Date.now()

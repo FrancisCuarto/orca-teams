@@ -12,6 +12,8 @@ import type {
   TeamActivityEntry,
   TeamInvitation
 } from '../../shared/teamwork/team-workspace-types'
+import type { AddCardCommentInput } from '../../shared/teamwork/team-comment-service'
+import type { TeamCardComment } from '../../shared/teamwork/team-kanban-types'
 import type {
   TeamMemberWithProfile,
   TeamSendInvitationRequest,
@@ -239,6 +241,18 @@ export class TeamHostDatabase {
     limit?: number
   }): TeamActivityEntry[] {
     return this.service.listActivity(options)
+  }
+
+  listCardComments(cardId: string): TeamCardComment[] {
+    return this.service.listCardComments(cardId)
+  }
+
+  addCardComment(input: AddCardCommentInput): TeamCardComment {
+    return this.service.addCardComment(input)
+  }
+
+  deleteCardComment(commentId: string): boolean {
+    return this.service.deleteCardComment(commentId)
   }
 
   saveSyncSnapshot(roomId: string, stateBase64: string): void {

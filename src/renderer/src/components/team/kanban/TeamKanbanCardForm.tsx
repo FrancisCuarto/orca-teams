@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import type {
   ExtendedTeamMember,
+  TeamCardComment,
+  TeamCommentMention,
   TeamKanbanCard,
   TeamKanbanColumn,
   TeamKanbanPriority
@@ -13,6 +15,7 @@ import {
 } from '../../../../../shared/teamwork/team-members'
 import { Input } from '@/components/ui/input'
 import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-keyboard-event'
+import { TeamCardCommentsPanel } from './TeamCardCommentsPanel'
 import { TeamKanbanCardAgentFields } from './TeamKanbanCardAgentFields'
 import { TeamKanbanCardAssigneeFields } from './TeamKanbanCardAssigneeFields'
 import { TeamKanbanCardChecklist } from './TeamKanbanCardChecklist'
@@ -24,6 +27,9 @@ export type TeamKanbanCardFormProps = {
   card: TeamKanbanCard | null
   columns: TeamKanbanColumn[]
   defaultColumnId?: string
+  projectId?: string
+  currentUserId?: string
+  currentUserName?: string
   configuredAgents?: TeamMemberEntry[]
   humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
@@ -31,6 +37,13 @@ export type TeamKanbanCardFormProps = {
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
+  onAddCardComment?: (comment: TeamCardComment) => void
+  onDeleteCardComment?: (commentId: string) => void
+  onDispatchAgentFollowUp?: (
+    card: TeamKanbanCard,
+    agentMention: TeamCommentMention,
+    comment: TeamCardComment
+  ) => void
 }
 
 const EMPTY_AGENTS: TeamMemberEntry[] = []
@@ -39,13 +52,19 @@ export function TeamKanbanCardForm({
   card,
   columns,
   defaultColumnId,
+  projectId = 'proj-default',
+  currentUserId = 'local-owner',
+  currentUserName = 'Equipo Local',
   configuredAgents = EMPTY_AGENTS,
   humanMembers,
   availableMembers,
   onClose,
   onSave,
   onDelete,
-  onDispatchAgent
+  onDispatchAgent,
+  onAddCardComment,
+  onDeleteCardComment,
+  onDispatchAgentFollowUp
 }: TeamKanbanCardFormProps): React.JSX.Element {
   const [title, setTitle] = useState(card?.title ?? '')
   const [description, setDescription] = useState(card?.description ?? '')
@@ -231,6 +250,28 @@ export function TeamKanbanCardForm({
           }
           onDelete={(id) => setChecklist((prev) => prev.filter((i) => i.id !== id))}
         />
+
+        {card ? (
+          <TeamCardCommentsPanel
+            key={card.id}
+            card={card}
+            projectId={projectId}
+            currentUserId={currentUserId}
+            currentUserName={currentUserName}
+            humans={humans}
+            configuredAgents={agents}
+            onAddComment={onAddCardComment}
+            onDeleteComment={onDeleteCardComment}
+            onDispatchAgentFollowUp={
+              onDispatchAgentFollowUp
+                ? (targetCard, mention, comment) => {
+                    onDispatchAgentFollowUp(targetCard, mention, comment)
+                    onClose()
+                  }
+                : undefined
+            }
+          />
+        ) : null}
       </div>
 
       <TeamKanbanCardFormFooter

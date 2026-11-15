@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type {
+  TeamCardComment,
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
@@ -32,6 +33,8 @@ export type UseTeamKanbanSyncReturn = {
   upsertCard: (card: TeamKanbanCard) => void
   moveCard: (cardId: string, targetColId: string, newPosition?: number) => void
   deleteCard: (cardId: string) => void
+  addCardComment: (comment: TeamCardComment) => void
+  deleteCardComment: (commentId: string) => void
   syncBoard: (board: TeamKanbanBoard) => void
   updateActiveCard: (cardId?: string) => void
 }
@@ -137,6 +140,14 @@ export function useTeamKanbanSync({
     crdtRef.current?.deleteCard(cardId)
   }, [])
 
+  const addCardComment = useCallback((comment: TeamCardComment) => {
+    crdtRef.current?.addCardComment(comment)
+  }, [])
+
+  const deleteCardComment = useCallback((commentId: string) => {
+    crdtRef.current?.deleteCardComment(commentId)
+  }, [])
+
   const syncBoard = useCallback((nextBoard: TeamKanbanBoard) => {
     crdtRef.current?.syncFromBoard(nextBoard)
   }, [])
@@ -161,6 +172,8 @@ export function useTeamKanbanSync({
     upsertCard,
     moveCard,
     deleteCard,
+    addCardComment,
+    deleteCardComment,
     syncBoard,
     updateActiveCard
   }

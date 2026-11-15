@@ -1,4 +1,5 @@
 import type {
+  TeamCardComment,
   TeamKanbanBoard,
   TeamKanbanCard,
   TeamKanbanColumn,
@@ -42,6 +43,9 @@ export type ITeamBoardCRDT = {
   deleteCard(cardId: string): void
   moveCard(cardId: string, targetColumnId: string, newIndex?: number): void
   setColumns(columns: TeamKanbanColumn[]): void
+  addCardComment(comment: TeamCardComment): void
+  deleteCardComment(commentId: string): void
+  getCardComments(cardId: string): TeamCardComment[]
   encodeStateAsUpdate(): Uint8Array
   applyUpdate(update: Uint8Array, origin?: unknown): void
   destroy(): void

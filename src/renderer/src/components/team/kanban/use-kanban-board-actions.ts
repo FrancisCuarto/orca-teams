@@ -1,6 +1,8 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import type {
+  TeamCardComment,
+  TeamCommentMention,
   TeamKanbanAssignee,
   TeamKanbanBoard,
   TeamKanbanCard
@@ -32,6 +34,8 @@ type Options = {
   startCardExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord | null>
   hydrateLatestForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
   onOpenExecutionModal: (cardId: string) => void
+  onCrdtAddComment?: (comment: TeamCardComment) => void
+  onCrdtDeleteComment?: (commentId: string) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -46,6 +50,8 @@ export function useKanbanBoardActions(options: Options) {
     startCardExecution,
     hydrateLatestForCard,
     onOpenExecutionModal,
+    onCrdtAddComment,
+    onCrdtDeleteComment,
     onChange
   } = options
 
@@ -167,12 +173,135 @@ export function useKanbanBoardActions(options: Options) {
     [executionsByCard, hydrateLatestForCard, onOpenExecutionModal]
   )
 
+  const handleAddCardComment = useCallback(
+    (comment: TeamCardComment) => {
+      if (onCrdtAddComment) {
+        onCrdtAddComment(comment)
+        return
+      }
+      const targetCard = board.cards[comment.cardId]
+      if (!targetCard) {
+        return
+      }
+      const existing = targetCard.comments ?? []
+      const nextComments = [...existing.filter((c) => c.id !== comment.id), comment]
+      onChange({
+        ...board,
+        cards: {
+          ...board.cards,
+          [targetCard.id]: {
+            ...targetCard,
+            comments: nextComments,
+            updatedAt: Date.now()
+          }
+        },
+        updatedAt: Date.now()
+      })
+    },
+    [board, onChange, onCrdtAddComment]
+  )
+
+  const handleDeleteCardComment = useCallback(
+    (commentId: string) => {
+      if (onCrdtDeleteComment) {
+        onCrdtDeleteComment(commentId)
+        return
+      }
+      let changed = false
+      const nextCards: Record<string, TeamKanbanCard> = {}
+      for (const [cardId, card] of Object.entries(board.cards)) {
+        if (card.comments?.some((c) => c.id === commentId)) {
+          changed = true
+          nextCards[cardId] = {
+            ...card,
+            comments: card.comments.filter((c) => c.id !== commentId),
+            updatedAt: Date.now()
+          }
+        } else {
+          nextCards[cardId] = card
+        }
+      }
+      if (changed) {
+        onChange({ ...board, cards: nextCards, updatedAt: Date.now() })
+      }
+    },
+    [board, onChange, onCrdtDeleteComment]
+  )
+
+  const handleDispatchAgentFollowUp = useCallback(
+    async (
+      card: TeamKanbanCard,
+      agentMention: TeamCommentMention,
+      comment: TeamCardComment
+    ): Promise<void> => {
+      const tokenLower = agentMention.token.toLowerCase()
+      const matchedAgent = configuredAgents.find(
+        (a) =>
+          (agentMention.targetId && a.id === agentMention.targetId) ||
+          a.id.toLowerCase() === tokenLower ||
+          a.agentType?.toLowerCase() === tokenLower ||
+          a.name.toLowerCase() === tokenLower
+      )
+      const targetAgentId = matchedAgent?.agentType ?? matchedAgent?.id ?? agentMention.token
+      const followUpCard: TeamKanbanCard = {
+        ...card,
+        assignee: {
+          type: 'agent',
+          name: matchedAgent?.name ?? agentMention.label,
+          agentType: targetAgentId,
+          model: matchedAgent?.defaultModel ?? matchedAgent?.models?.[0] ?? card.assignee?.model,
+          skills: matchedAgent?.defaultSkills ?? card.assignee?.skills
+        }
+      }
+      const followUpPrompt = `Comentario de ${comment.authorName}: ${comment.body}`
+      try {
+        const record = await startCardExecution({
+          card: followUpCard,
+          projectId,
+          projectPath,
+          actorUserId,
+          sprintGoal: board.sprintGoal,
+          isolateWorktree: card.isolateWorktree,
+          requiresApproval: card.requiresApproval,
+          followUpPrompt,
+          targetAgentId
+        })
+        if (record) {
+          onOpenExecutionModal(card.id)
+          toast.info(`Consulta enviada a @${agentMention.token}`)
+          return
+        }
+        const { prompt } = buildAgentDispatchPrompt(followUpCard)
+        await copyTextToClipboard(`${prompt}\n\n### Seguimiento\n${followUpPrompt}`)
+        toast.warning('Runtime de ejecución no disponible; prompt copiado al portapapeles')
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : `No se pudo despachar consulta a @${agentMention.token}`
+        )
+      }
+    },
+    [
+      configuredAgents,
+      startCardExecution,
+      projectId,
+      projectPath,
+      actorUserId,
+      board.sprintGoal,
+      onOpenExecutionModal
+    ]
+  )
+
   return {
     triggerImmediateExecution,
     handleSaveCard,
     handleAssignDraggedMember,
     handleDispatchAgent,
     handleViewExecution,
+    handleAddCardComment,
+    handleDeleteCardComment,
+    handleDispatchAgentFollowUp,
     ...secondary
   }
 }

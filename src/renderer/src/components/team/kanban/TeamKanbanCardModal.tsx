@@ -1,6 +1,8 @@
 import React from 'react'
 import type {
   ExtendedTeamMember,
+  TeamCardComment,
+  TeamCommentMention,
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
@@ -19,6 +21,9 @@ type Props = {
   card: TeamKanbanCard | null
   columns: TeamKanbanColumn[]
   defaultColumnId?: string
+  projectId?: string
+  currentUserId?: string
+  currentUserName?: string
   configuredAgents?: TeamMemberEntry[]
   humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
@@ -26,6 +31,13 @@ type Props = {
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
+  onAddCardComment?: (comment: TeamCardComment) => void
+  onDeleteCardComment?: (commentId: string) => void
+  onDispatchAgentFollowUp?: (
+    card: TeamKanbanCard,
+    agentMention: TeamCommentMention,
+    comment: TeamCardComment
+  ) => void
 }
 
 export function TeamKanbanCardModal({
@@ -33,13 +45,19 @@ export function TeamKanbanCardModal({
   card,
   columns,
   defaultColumnId,
+  projectId,
+  currentUserId,
+  currentUserName,
   configuredAgents,
   humanMembers,
   availableMembers,
   onClose,
   onSave,
   onDelete,
-  onDispatchAgent
+  onDispatchAgent,
+  onAddCardComment,
+  onDeleteCardComment,
+  onDispatchAgentFollowUp
 }: Props): React.JSX.Element {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -58,6 +76,9 @@ export function TeamKanbanCardModal({
             card={card}
             columns={columns}
             defaultColumnId={defaultColumnId}
+            projectId={projectId}
+            currentUserId={currentUserId}
+            currentUserName={currentUserName}
             configuredAgents={configuredAgents}
             humanMembers={humanMembers}
             availableMembers={availableMembers}
@@ -65,6 +86,9 @@ export function TeamKanbanCardModal({
             onSave={onSave}
             onDelete={onDelete}
             onDispatchAgent={onDispatchAgent}
+            onAddCardComment={onAddCardComment}
+            onDeleteCardComment={onDeleteCardComment}
+            onDispatchAgentFollowUp={onDispatchAgentFollowUp}
           />
         ) : null}
       </DialogContent>

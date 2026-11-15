@@ -1,7 +1,14 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, CheckSquare, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  GitBranch,
+  MessageSquare
+} from 'lucide-react'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
@@ -57,6 +64,7 @@ export function TeamKanbanCardItem({
   const priority = PRIORITY_STYLES[card.priority] ?? PRIORITY_STYLES.medium
   const completedChecklist = card.checklist?.filter((item) => item.done).length ?? 0
   const totalChecklist = card.checklist?.length ?? 0
+  const commentCount = card.comments?.length ?? 0
 
   return (
     <div
@@ -182,32 +190,43 @@ export function TeamKanbanCardItem({
         </div>
       ) : null}
 
-      {/* Footer: Checklist Summary & Assignee */}
+      {/* Footer: Checklist Summary, Comment Count & Assignee */}
       <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs text-muted-foreground mt-0.5">
-        {totalChecklist > 0 ? (
-          <button
-            type="button"
-            className="flex items-center gap-1 text-3xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsChecklistExpanded((prev) => !prev)
-            }}
-            title={isChecklistExpanded ? 'Ocultar checklist' : 'Ver checklist'}
-          >
-            <CheckSquare className="size-3" />
-            <span>
-              {completedChecklist}/{totalChecklist}
-            </span>
-            {isChecklistExpanded ? (
-              <ChevronUp className="size-2.5" />
-            ) : (
-              <ChevronDown className="size-2.5" />
-            )}
-          </button>
-        ) : (
-          <div />
-        )}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {totalChecklist > 0 ? (
+            <button
+              type="button"
+              className="flex items-center gap-1 text-3xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsChecklistExpanded((prev) => !prev)
+              }}
+              title={isChecklistExpanded ? 'Ocultar checklist' : 'Ver checklist'}
+            >
+              <CheckSquare className="size-3" />
+              <span>
+                {completedChecklist}/{totalChecklist}
+              </span>
+              {isChecklistExpanded ? (
+                <ChevronUp className="size-2.5" />
+              ) : (
+                <ChevronDown className="size-2.5" />
+              )}
+            </button>
+          ) : null}
+
+          {commentCount > 0 ? (
+            <Badge
+              variant="outline"
+              className="text-3xs px-1.5 py-0 h-4 gap-1 text-muted-foreground font-normal"
+              title={`${commentCount} ${commentCount === 1 ? 'comentario' : 'comentarios'}`}
+            >
+              <MessageSquare className="size-2.5" />
+              <span>{commentCount}</span>
+            </Badge>
+          ) : null}
+        </div>
 
         <TeamKanbanCardAgentBadge
           card={card}

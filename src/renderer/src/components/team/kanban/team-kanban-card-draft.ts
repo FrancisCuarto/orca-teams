@@ -63,6 +63,7 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
       : undefined,
     labels,
     checklist: input.checklist,
+    ...(existingCard?.comments ? { comments: existingCard.comments } : {}),
     estimatePoints: input.estimatePoints,
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
     isolateWorktree: input.isolateWorktree,

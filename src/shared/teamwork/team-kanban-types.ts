@@ -24,6 +24,28 @@ export type TeamKanbanChecklistItem = {
   done: boolean
 }
 
+export type TeamCommentMentionType = 'human' | 'agent'
+
+export type TeamCommentMention = {
+  token: string
+  label: string
+  type: TeamCommentMentionType
+  targetId?: string
+}
+
+export type TeamCardComment = {
+  id: string
+  cardId: string
+  projectId: string
+  authorId: string
+  authorName: string
+  authorType: 'human' | 'agent'
+  body: string
+  mentions: TeamCommentMention[]
+  createdAt: number
+  updatedAt?: number
+}
+
 export type TeamKanbanCard = {
   id: string
   title: string
@@ -33,6 +55,7 @@ export type TeamKanbanCard = {
   assignee?: TeamKanbanAssignee
   labels: string[]
   checklist: TeamKanbanChecklistItem[]
+  comments?: TeamCardComment[]
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
@@ -152,3 +175,157 @@ export function isTeamNoteCategory(value: string): value is TeamNoteCategory {
 export function isTeamNoteStatus(value: string): value is TeamNoteStatus {
   return value === 'draft' || value === 'proposed' || value === 'accepted' || value === 'deprecated'
 }
+
+const KNOWN_AGENT_MENTION_HANDLES = new Set([
+  'claude',
+  'openclaude',
+  'claude-agent-teams',
+  'codex',
+  'opencode',
+  'opencode2',
+  'antigravity',
+  'agy',
+  'gemini',
+  'aider',
+  'goose'
+])
+
+export function toMentionHandle(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .trim()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export type ExtractMentionsOptions = {
+  members?: readonly {
+    id: string
+    name: string
+    type?: 'human' | 'agent'
+    agentType?: string
+  }[]
+  agents?: readonly {
+    id: string
+    name: string
+    agentType?: string
+  }[]
+}
+
+export function extractMentionsFromComment(
+  body: string,
+  options?: ExtractMentionsOptions
+): TeamCommentMention[] {
+  const mentions: TeamCommentMention[] = []
+  const seen = new Set<string>()
+  const pattern = /(?:^|[\s(\[,])@([a-zA-Z0-9][a-zA-Z0-9._-]*)/g
+
+  for (const match of body.matchAll(pattern)) {
+    const rawToken = match[1]?.replace(/[.,;:!?]+$/, '') ?? ''
+    if (!rawToken) {
+      continue
+    }
+    const normalized = rawToken.toLowerCase()
+    if (seen.has(normalized)) {
+      continue
+    }
+    seen.add(normalized)
+
+    const matchedAgent = options?.agents?.find(
+      (agent) =>
+        agent.id.toLowerCase() === normalized ||
+        agent.agentType?.toLowerCase() === normalized ||
+        toMentionHandle(agent.name) === normalized ||
+        agent.name.toLowerCase() === normalized
+    )
+    if (matchedAgent) {
+      mentions.push({
+        token: rawToken,
+        label: matchedAgent.name,
+        type: 'agent',
+        targetId: matchedAgent.id
+      })
+      continue
+    }
+
+    const matchedMember = options?.members?.find((member) => {
+      const firstWord = member.name.trim().toLowerCase().split(/\s+/)[0]
+      return (
+        member.id.toLowerCase() === normalized ||
+        toMentionHandle(member.name) === normalized ||
+        member.name.toLowerCase() === normalized ||
+        firstWord === normalized
+      )
+    })
+    if (matchedMember) {
+      const isAgentMember =
+        matchedMember.type === 'agent' || KNOWN_AGENT_MENTION_HANDLES.has(normalized)
+      mentions.push({
+        token: rawToken,
+        label: matchedMember.name,
+        type: isAgentMember ? 'agent' : 'human',
+        targetId: matchedMember.id
+      })
+      continue
+    }
+
+    if (KNOWN_AGENT_MENTION_HANDLES.has(normalized)) {
+      mentions.push({
+        token: rawToken,
+        label: rawToken,
+        type: 'agent'
+      })
+      continue
+    }
+
+    mentions.push({
+      token: rawToken,
+      label: rawToken,
+      type: 'human'
+    })
+  }
+
+  return mentions
+}
+
+export function isTeamCommentMention(value: unknown): value is TeamCommentMention {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  const hasToken = 'token' in value && typeof value.token === 'string'
+  const hasLabel = 'label' in value && typeof value.label === 'string'
+  const hasType = 'type' in value && (value.type === 'human' || value.type === 'agent')
+  const hasValidTarget =
+    !('targetId' in value) || value.targetId === undefined || typeof value.targetId === 'string'
+  return hasToken && hasLabel && hasType && hasValidTarget
+}
+
+export function isTeamCardComment(value: unknown): value is TeamCardComment {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  return (
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'cardId' in value &&
+    typeof value.cardId === 'string' &&
+    'projectId' in value &&
+    typeof value.projectId === 'string' &&
+    'authorId' in value &&
+    typeof value.authorId === 'string' &&
+    'authorName' in value &&
+    typeof value.authorName === 'string' &&
+    'authorType' in value &&
+    (value.authorType === 'human' || value.authorType === 'agent') &&
+    'body' in value &&
+    typeof value.body === 'string' &&
+    'mentions' in value &&
+    Array.isArray(value.mentions) &&
+    value.mentions.every(isTeamCommentMention) &&
+    'createdAt' in value &&
+    typeof value.createdAt === 'number'
+  )
+}
+

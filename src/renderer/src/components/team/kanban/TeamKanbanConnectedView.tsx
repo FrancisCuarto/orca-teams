@@ -33,15 +33,16 @@ export function TeamKanbanConnectedView({
   syncToken,
   onPersist
 }: Props): React.JSX.Element {
-  const { board, presences, syncStatus, syncBoard } = useTeamKanbanSync({
-    boardId: initialBoard.id,
-    projectId,
-    currentUser,
-    relayUrl,
-    syncToken,
-    initialBoard,
-    onPersist
-  })
+  const { board, presences, syncStatus, syncBoard, addCardComment, deleteCardComment } =
+    useTeamKanbanSync({
+      boardId: initialBoard.id,
+      projectId,
+      currentUser,
+      relayUrl,
+      syncToken,
+      initialBoard,
+      onPersist
+    })
 
   const activeBoard = board ?? initialBoard
   const activeCardsCount = useMemo(() => {
@@ -68,6 +69,8 @@ export function TeamKanbanConnectedView({
         currentUserId={currentUser.userId}
         currentUserName={currentUser.displayName}
         humanMembers={humanMembers}
+        onAddCardComment={addCardComment}
+        onDeleteCardComment={deleteCardComment}
         onChange={syncBoard}
       />
     </div>
