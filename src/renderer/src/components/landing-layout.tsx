@@ -1,6 +1,6 @@
 import { ShortcutKeyCombo } from './ShortcutKeyCombo'
 import type { ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
-import logo from '../../../../resources/logo.svg'
+import logo from '../../../../resources/icon.png'
 import { useTranslate } from '@/i18n/use-translate'
 
 export type LandingShortcutItem = {
@@ -23,7 +23,7 @@ export function LandingBrand(): React.JSX.Element {
         <img
           src={logo}
           alt={t('auto.components.Landing.520304a067', 'Orca logo')}
-          className="size-12"
+          className="size-12 rounded-xl object-contain"
         />
       </div>
       <h1 className="text-4xl font-bold text-foreground tracking-tight">

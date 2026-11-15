@@ -1,0 +1,70 @@
+import type {
+  TeamKanbanCard,
+  TeamKanbanChecklistItem,
+  TeamKanbanColumn,
+  TeamKanbanPriority
+} from '../../../../../shared/teamwork/team-kanban-types'
+import type { TeamMemberEntry } from '../../../../../shared/teamwork/team-members'
+
+export type CardFormDraftInput = {
+  existingCard: TeamKanbanCard | null
+  title: string
+  description: string
+  columnId: string
+  columns: TeamKanbanColumn[]
+  priority: TeamKanbanPriority
+  assigneeType: 'human' | 'agent'
+  assigneeName: string
+  matchedAgent?: TeamMemberEntry
+  agentModel: string
+  agentSkills: string[]
+  labelsText: string
+  checklist: TeamKanbanChecklistItem[]
+  estimatePoints?: number
+  branchOrWorktree: string
+  blockedReason: string
+}
+
+export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanCard {
+  const { existingCard, columns, assigneeType, assigneeName, matchedAgent } = input
+  const labels = input.labelsText
+    .split(',')
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  const resolvedAgentType =
+    assigneeType === 'agent'
+      ? (matchedAgent?.agentType ??
+        matchedAgent?.id ??
+        existingCard?.assignee?.agentType ??
+        'custom')
+      : undefined
+  const resolvedModel =
+    assigneeType === 'agent'
+      ? input.agentModel.trim() || matchedAgent?.defaultModel || undefined
+      : undefined
+
+  return {
+    id: existingCard?.id ?? `card-${Date.now()}`,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    columnId: input.columnId || columns[0]?.id || 'col-backlog',
+    priority: input.priority,
+    assignee: assigneeName.trim()
+      ? {
+          type: assigneeType,
+          name: assigneeName.trim(),
+          agentType: resolvedAgentType,
+          model: resolvedModel,
+          skills: assigneeType === 'agent' ? input.agentSkills : undefined
+        }
+      : undefined,
+    labels,
+    checklist: input.checklist,
+    estimatePoints: input.estimatePoints,
+    branchOrWorktree: input.branchOrWorktree.trim() || undefined,
+    blockedReason: input.blockedReason.trim() || undefined,
+    createdAt: existingCard?.createdAt ?? Date.now(),
+    updatedAt: Date.now()
+  }
+}

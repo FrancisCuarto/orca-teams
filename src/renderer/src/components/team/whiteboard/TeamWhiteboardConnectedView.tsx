@@ -14,6 +14,7 @@ type Props = {
     color?: string
   }
   onPersist?: (wb: TeamWhiteboard) => void
+  onCreateTask?: (item: TeamWhiteboard['items'][number]) => void
 }
 
 export function TeamWhiteboardConnectedView({
@@ -21,7 +22,8 @@ export function TeamWhiteboardConnectedView({
   projectId,
   initialWhiteboard,
   currentUser,
-  onPersist
+  onPersist,
+  onCreateTask
 }: Props): React.JSX.Element {
   const { whiteboard, remoteCursors, broadcastCursor } = useTeamWhiteboardSync({
     whiteboardId,
@@ -39,6 +41,7 @@ export function TeamWhiteboardConnectedView({
       onChange={(updated) => {
         onPersist?.(updated)
       }}
+      onCreateTask={onCreateTask}
     />
   )
 }

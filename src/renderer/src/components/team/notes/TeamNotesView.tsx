@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react'
-import { FileText, Zap } from 'lucide-react'
+import { Copy, FileText, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import type {
   TeamNote,
   TeamNoteCategory,
   TeamNotesCollection
 } from '../../../../../shared/teamwork/team-kanban-types'
+import { copyTextToClipboard } from '../utils/team-clipboard'
 import { getTeamNoteTemplate } from './team-note-templates'
 import { TeamNotesSidebar } from './TeamNotesSidebar'
 import { TeamNoteEditor } from './TeamNoteEditor'
@@ -104,17 +105,36 @@ export function TeamNotesView({
     toast.success('Nota eliminada')
   }
 
-  const handleSendToAgentContext = () => {
+  const handleCopyMarkdown = async () => {
+    if (!activeNote) {
+      return
+    }
+    const markdown = `# ${activeNote.title}\n\n${activeNote.content}`
+    const copied = await copyTextToClipboard(markdown)
+    if (copied) {
+      toast.success('Nota copiada en formato Markdown', {
+        icon: <Copy className="size-4 text-git-graph-lane-2" />
+      })
+    } else {
+      toast.error('No se pudo copiar la nota al portapapeles')
+    }
+  }
+
+  const handleSendToAgentContext = async () => {
     if (!activeNote) {
       return
     }
     const contextPayload = `[CONTEXTO DE EQUIPO Y ARQUITECTURA: ${activeNote.title}]\nCategoría: ${activeNote.category.toUpperCase()}\nEtiquetas: ${activeNote.tags.join(', ')}\n\n${activeNote.content}`
 
-    void navigator.clipboard.writeText(contextPayload)
-    toast.success('Nota copiada al portapapeles con formato de contexto para Agente', {
-      description: 'Pégala en tu chat de agente activo para guiar su implementación.',
-      icon: <Zap className="size-4 text-git-graph-lane-1" />
-    })
+    const copied = await copyTextToClipboard(contextPayload)
+    if (copied) {
+      toast.success('Nota copiada al portapapeles con formato de contexto para Agente', {
+        description: 'Pégala en tu chat de agente activo para guiar su implementación.',
+        icon: <Zap className="size-4 text-git-graph-lane-1" />
+      })
+    } else {
+      toast.error('No se pudo copiar el contexto al portapapeles')
+    }
   }
 
   const handleAddTag = () => {
@@ -182,7 +202,12 @@ export function TeamNotesView({
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onToggleChecklistLine={handleToggleChecklistLine}
-          onSendToAgentContext={handleSendToAgentContext}
+          onCopyMarkdown={() => {
+            void handleCopyMarkdown()
+          }}
+          onSendToAgentContext={() => {
+            void handleSendToAgentContext()
+          }}
           onExtractTasksToKanban={
             onExtractTasksToKanban
               ? () => onExtractTasksToKanban(activeNote.title, activeNote.content)
