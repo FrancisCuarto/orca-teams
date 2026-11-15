@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
+  TeamAddCardCommentRequest,
   TeamApi,
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
@@ -526,6 +527,36 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
       }
       db.revokeInvitation(invitationId, resolvedActorId)
     }
+  )
+
+  ipcMain.handle('team:listCardComments', (_event, cardId: string) => db.listCardComments(cardId))
+
+  ipcMain.handle('team:addCardComment', (_event, request: TeamAddCardCommentRequest) => {
+    const comment = db.addCardComment(request)
+    recordSystemActivity({
+      teamId: resolveTeamIdForProject(comment.projectId),
+      projectId: comment.projectId,
+      actorId: comment.authorId,
+      actorName: comment.authorName,
+      actorType: comment.authorType,
+      action: 'comment.added',
+      targetType: 'card',
+      targetId: comment.cardId,
+      summary:
+        comment.mentions.length > 0
+          ? `Comentó en tarjeta (${comment.mentions.map((m) => `@${m.token}`).join(', ')}): "${comment.body.slice(0, 80)}"`
+          : `Comentó en tarjeta: "${comment.body.slice(0, 80)}"`,
+      metadata: {
+        commentId: comment.id,
+        cardId: comment.cardId,
+        mentions: comment.mentions.map((m) => m.token)
+      }
+    })
+    return comment
+  })
+
+  ipcMain.handle('team:deleteCardComment', (_event, commentId: string) =>
+    db.deleteCardComment(commentId)
   )
 
   registerTeamAuthSyncAndMailHandlers({

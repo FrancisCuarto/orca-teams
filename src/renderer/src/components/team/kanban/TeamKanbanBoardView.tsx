@@ -3,6 +3,7 @@ import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from
 import { toast } from 'sonner'
 import type {
   ExtendedTeamMember,
+  TeamCardComment,
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
@@ -38,6 +39,8 @@ type Props = {
   userRole?: TeamRole
   permissions?: TeamPermissions
   humanMembers?: ExtendedTeamMember[]
+  onAddCardComment?: (comment: TeamCardComment) => void
+  onDeleteCardComment?: (commentId: string) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -50,6 +53,8 @@ export function TeamKanbanBoardView({
   userRole = 'owner',
   permissions,
   humanMembers,
+  onAddCardComment,
+  onDeleteCardComment,
   onChange
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
@@ -86,6 +91,8 @@ export function TeamKanbanBoardView({
   const metrics = useMemo(() => computeBoardSprintMetrics(board), [board])
   const filters = useKanbanBoardFilters(board.columns, cardMap)
 
+  const resolvedProjectId = projectId ?? board.projectId ?? 'proj-default'
+
   const actions = useKanbanBoardActions({
     board,
     projectId: resolvedProjectId,
@@ -98,6 +105,8 @@ export function TeamKanbanBoardView({
     startCardExecution,
     hydrateLatestForCard,
     onOpenExecutionModal: setExecutionModalCardId,
+    onCrdtAddComment: onAddCardComment,
+    onCrdtDeleteComment: onDeleteCardComment,
     onChange
   })
 
@@ -187,6 +196,7 @@ export function TeamKanbanBoardView({
   )
 
   const activeCard = dnd.activeCardId ? (cardMap[dnd.activeCardId] ?? null) : null
+  const activeEditingCard = editingCard ? (cardMap[editingCard.id] ?? editingCard) : null
   const executionModalCard = executionModalCardId ? (cardMap[executionModalCardId] ?? null) : null
   const activeExecution = executionModalCardId
     ? (executionsByCard.get(executionModalCardId) ?? null)
@@ -297,9 +307,12 @@ export function TeamKanbanBoardView({
 
       <TeamKanbanCardModal
         isOpen={isModalOpen}
-        card={editingCard}
+        card={activeEditingCard}
         columns={board.columns}
         defaultColumnId={targetColumnId}
+        projectId={resolvedProjectId}
+        currentUserId={currentUserId}
+        currentUserName={currentUserName ?? 'Equipo Local'}
         configuredAgents={configuredAgents}
         humanMembers={humanMembers}
         availableMembers={board.customMembers}
@@ -309,6 +322,11 @@ export function TeamKanbanBoardView({
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
         onDispatchAgent={actions.handleDispatchAgent}
+        onAddCardComment={actions.handleAddCardComment}
+        onDeleteCardComment={actions.handleDeleteCardComment}
+        onDispatchAgentFollowUp={(targetCard, mention, comment) =>
+          void actions.handleDispatchAgentFollowUp(targetCard, mention, comment)
+        }
       />
       <TeamAgentExecutionModal
         open={Boolean(executionModalCardId && activeExecution)}

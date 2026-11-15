@@ -133,6 +133,21 @@ CREATE TABLE IF NOT EXISTS factory_runs (
 );
 CREATE INDEX IF NOT EXISTS factory_runs_card_id ON factory_runs(card_id);
 CREATE INDEX IF NOT EXISTS factory_runs_project_id ON factory_runs(project_id);
+
+CREATE TABLE IF NOT EXISTS team_card_comments (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  author_id TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  author_type TEXT NOT NULL,
+  body TEXT NOT NULL,
+  mentions_json TEXT NOT NULL DEFAULT '[]',
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS team_card_comments_card_id ON team_card_comments(card_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS team_card_comments_project_id ON team_card_comments(project_id, created_at DESC);
 `
 
 export function teamSchemaStatements(): string[] {

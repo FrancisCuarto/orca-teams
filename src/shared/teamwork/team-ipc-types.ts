@@ -10,7 +10,7 @@ import type {
   TeamSyncSettings,
   TeamUserProfile
 } from './team-workspace-types'
-import type { TeamKanbanCard } from './team-kanban-types'
+import type { TeamCardComment, TeamCommentMention, TeamKanbanCard } from './team-kanban-types'
 import type { FactoryConfig, FactoryRunRecord } from './team-factory-types'
 
 export type ConfiguredTeamAgent = {
@@ -90,6 +90,20 @@ export type TeamStartExecutionRequest = {
   sprintGoal?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
+  followUpPrompt?: string
+  targetAgentId?: string
+}
+
+export type TeamAddCardCommentRequest = {
+  id?: string
+  cardId: string
+  projectId: string
+  authorId: string
+  authorName: string
+  authorType?: 'human' | 'agent'
+  body: string
+  mentions?: TeamCommentMention[]
+  createdAt?: number
 }
 
 export type TeamExecutionEvent =
@@ -217,4 +231,7 @@ export type TeamApi = {
   ) => Promise<TeamUserProfile>
   getSyncStatus: () => Promise<TeamSyncRuntimeStatus>
   configureSync: (settings: Partial<TeamSyncSettings>) => Promise<TeamSyncRuntimeStatus>
+  listCardComments: (cardId: string) => Promise<TeamCardComment[]>
+  addCardComment: (request: TeamAddCardCommentRequest) => Promise<TeamCardComment>
+  deleteCardComment: (commentId: string) => Promise<boolean>
 }

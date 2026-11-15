@@ -85,6 +85,19 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     verifyMagicLinkCode: vi.fn(),
     getSyncStatus: vi.fn(),
     configureSync: vi.fn(),
+    listCardComments: vi.fn(async () => []),
+    addCardComment: vi.fn(async (req) => ({
+      id: req.id ?? 'cmt-mock',
+      cardId: req.cardId,
+      projectId: req.projectId,
+      authorId: req.authorId,
+      authorName: req.authorName,
+      authorType: req.authorType ?? 'human',
+      body: req.body,
+      mentions: req.mentions ?? [],
+      createdAt: req.createdAt ?? Date.now()
+    })),
+    deleteCardComment: vi.fn(async () => true),
     ...overrides
   }
   Object.defineProperty(window, 'api', {

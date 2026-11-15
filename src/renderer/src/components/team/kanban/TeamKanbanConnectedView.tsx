@@ -43,15 +43,16 @@ export function TeamKanbanConnectedView({
   onPersist
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
-  const { board, presences, syncStatus, syncBoard } = useTeamKanbanSync({
-    boardId: initialBoard.id,
-    projectId,
-    currentUser,
-    relayUrl,
-    syncToken,
-    initialBoard,
-    onPersist: resolvedPermissions.canEditBoard ? onPersist : undefined
-  })
+  const { board, presences, syncStatus, syncBoard, addCardComment, deleteCardComment } =
+    useTeamKanbanSync({
+      boardId: initialBoard.id,
+      projectId,
+      currentUser,
+      relayUrl,
+      syncToken,
+      initialBoard,
+      onPersist: resolvedPermissions.canEditBoard ? onPersist : undefined
+    })
 
   const activeBoard = board ?? initialBoard
   const activeCardsCount = useMemo(() => {
@@ -80,6 +81,8 @@ export function TeamKanbanConnectedView({
         userRole={userRole}
         permissions={resolvedPermissions}
         humanMembers={humanMembers}
+        onAddCardComment={addCardComment}
+        onDeleteCardComment={deleteCardComment}
         onChange={(updatedBoard) => {
           if (resolvedPermissions.canEditBoard) {
             syncBoard(updatedBoard)

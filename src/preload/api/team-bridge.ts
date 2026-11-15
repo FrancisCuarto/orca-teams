@@ -2,6 +2,7 @@ import { ipcRenderer } from 'electron'
 import type { PreloadApi } from '../api-types'
 import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
+  TeamAddCardCommentRequest,
   TeamApi,
   TeamApproveExecutionRequest,
   TeamDeepLinkJoinPayload,
@@ -102,5 +103,9 @@ export const teamApi: TeamApi = {
     ipcRenderer.invoke('team:verifyMagicLinkCode', email, code, displayName),
   getSyncStatus: () => ipcRenderer.invoke('team:getSyncStatus'),
   configureSync: (settings: Partial<TeamSyncSettings>) =>
-    ipcRenderer.invoke('team:configureSync', settings)
+    ipcRenderer.invoke('team:configureSync', settings),
+  listCardComments: (cardId: string) => ipcRenderer.invoke('team:listCardComments', cardId),
+  addCardComment: (request: TeamAddCardCommentRequest) =>
+    ipcRenderer.invoke('team:addCardComment', request),
+  deleteCardComment: (commentId: string) => ipcRenderer.invoke('team:deleteCardComment', commentId)
 } satisfies NonNullable<PreloadApi['team']>

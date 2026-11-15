@@ -94,15 +94,18 @@ export function buildAgentCliCommand(
   }
 }
 
-export function extractCardAgentAssignment(card: TeamStartExecutionRequest['card']): {
+export function extractCardAgentAssignment(
+  card: TeamStartExecutionRequest['card'],
+  targetAgentId?: string
+): {
   agentId: string
   model?: string
   skills: string[]
 } {
-  let agentId = ''
-  if ('assignedAgentId' in card && typeof card.assignedAgentId === 'string') {
+  let agentId = targetAgentId?.trim() ?? ''
+  if (!agentId && 'assignedAgentId' in card && typeof card.assignedAgentId === 'string') {
     agentId = card.assignedAgentId.trim()
-  } else if (card.assignee?.type === 'agent') {
+  } else if (!agentId && card.assignee?.type === 'agent') {
     agentId = (card.assignee.agentType ?? card.assignee.name ?? '').trim()
   }
   if (!agentId) {
@@ -125,8 +128,8 @@ export function extractCardAgentAssignment(card: TeamStartExecutionRequest['card
 }
 
 export function buildKanbanAgentPrompt(req: TeamStartExecutionRequest): string {
-  const { card, sprintGoal } = req
-  const { skills } = extractCardAgentAssignment(card)
+  const { card, sprintGoal, followUpPrompt } = req
+  const { skills } = extractCardAgentAssignment(card, req.targetAgentId)
   const sections: string[] = [
     `# Tarea Kanban: ${card.title}`,
     `Prioridad: ${card.priority.toUpperCase()}`
@@ -144,6 +147,9 @@ export function buildKanbanAgentPrompt(req: TeamStartExecutionRequest): string {
   if (card.checklist.length > 0) {
     const items = card.checklist.map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n')
     sections.push(`## Criterios de Aceptación\n${items}`)
+  }
+  if (followUpPrompt?.trim()) {
+    sections.push(`## Seguimiento / Consulta Mencionada\n${followUpPrompt.trim()}`)
   }
   if (skills.length > 0) {
     sections.push(`## Instrucciones / Skills\nAplica: ${skills.join(', ')}`)
