@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { AlertTriangle, CheckSquare, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
+import type { FactoryRunRecord } from '../../../../../shared/teamwork/team-factory-types'
 import type {
   TeamKanbanCard,
   TeamKanbanColumn
@@ -17,6 +18,9 @@ type Props = {
   onDispatchAgent?: (card: TeamKanbanCard) => void
   executionStatus?: AgentExecutionStatus
   onViewExecution?: (card: TeamKanbanCard) => void
+  factoryRun?: FactoryRunRecord
+  onStartFactory?: (card: TeamKanbanCard) => void
+  onViewFactory?: (card: TeamKanbanCard) => void
   onToggleChecklistItem?: (cardId: string, itemId: string) => void
   onQuickMoveColumn?: (cardId: string, targetColId: string) => void
   isOverlay?: boolean
@@ -39,6 +43,9 @@ export function TeamKanbanCardItem({
   onDispatchAgent,
   executionStatus,
   onViewExecution,
+  factoryRun,
+  onStartFactory,
+  onViewFactory,
   onToggleChecklistItem,
   onQuickMoveColumn,
   isOverlay = false
@@ -213,8 +220,11 @@ export function TeamKanbanCardItem({
           card={card}
           assignee={card.assignee}
           executionStatus={executionStatus}
+          factoryRun={factoryRun}
           onDispatchAgent={onDispatchAgent}
           onViewExecution={onViewExecution}
+          onStartFactory={onStartFactory}
+          onViewFactory={onViewFactory}
         />
       </div>
 

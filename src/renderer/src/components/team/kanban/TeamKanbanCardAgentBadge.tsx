@@ -1,6 +1,16 @@
 import React from 'react'
-import { AlertCircle, CheckCircle2, Loader2, Sparkles, User, Zap } from 'lucide-react'
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Factory,
+  Loader2,
+  Sparkles,
+  User,
+  Zap
+} from 'lucide-react'
 import { Button } from '../../ui/button'
+import type { FactoryRunRecord } from '../../../../../shared/teamwork/team-factory-types'
 import type {
   TeamKanbanAssignee,
   TeamKanbanCard
@@ -11,16 +21,22 @@ type Props = {
   card: TeamKanbanCard
   assignee?: TeamKanbanAssignee
   executionStatus?: AgentExecutionStatus
+  factoryRun?: FactoryRunRecord
   onDispatchAgent?: (card: TeamKanbanCard) => void
   onViewExecution?: (card: TeamKanbanCard) => void
+  onStartFactory?: (card: TeamKanbanCard) => void
+  onViewFactory?: (card: TeamKanbanCard) => void
 }
 
 export function TeamKanbanCardAgentBadge({
   card,
   assignee,
   executionStatus,
+  factoryRun,
   onDispatchAgent,
-  onViewExecution
+  onViewExecution,
+  onStartFactory,
+  onViewFactory
 }: Props): React.JSX.Element | null {
   if (!assignee) {
     return null
@@ -28,9 +44,46 @@ export function TeamKanbanCardAgentBadge({
 
   const isAgent = assignee.type === 'agent'
   const isRunning = executionStatus === 'running' || executionStatus === 'queued'
+  const isFactoryRunning = factoryRun?.status === 'running' || factoryRun?.status === 'queued'
+  const isWaitingHuman = factoryRun?.status === 'waiting_human'
 
   return (
-    <div className="flex items-center gap-1.5 shrink-0">
+    <div className="flex flex-wrap items-center gap-1 shrink-0">
+      {/* Factory live stage badge */}
+      {factoryRun && onViewFactory ? (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewFactory(card)
+          }}
+          className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-3xs font-medium border cursor-pointer transition-all ${
+            isFactoryRunning
+              ? 'bg-primary/10 border-primary/30 text-primary animate-pulse'
+              : isWaitingHuman
+                ? 'bg-destructive/15 border-destructive/40 text-destructive'
+                : factoryRun.status === 'completed'
+                  ? 'bg-secondary/40 border-border text-foreground'
+                  : factoryRun.status === 'failed'
+                    ? 'bg-destructive/10 border-destructive/20 text-destructive'
+                    : 'bg-muted border-border text-muted-foreground'
+          }`}
+          title={`Ver Software Factory (${factoryRun.currentStage})`}
+        >
+          {isFactoryRunning ? (
+            <Loader2 className="size-2.5 animate-spin" />
+          ) : isWaitingHuman ? (
+            <AlertTriangle className="size-2.5" />
+          ) : (
+            <Factory className="size-2.5" />
+          )}
+          <span className="uppercase">
+            {isWaitingHuman ? 'GATE' : `F:${factoryRun.currentStage}`}
+          </span>
+        </button>
+      ) : null}
+
       {/* Execution status indicator badge */}
       {isAgent && executionStatus && onViewExecution ? (
         <button
@@ -64,8 +117,25 @@ export function TeamKanbanCardAgentBadge({
         </button>
       ) : null}
 
+      {/* Quick Factory pipeline trigger */}
+      {isAgent && !isRunning && !isFactoryRunning && onStartFactory ? (
+        <Button
+          size="xs"
+          variant="ghost"
+          title="Ejecutar pipeline completo Software Factory (Spec → TDD → 4 Revisores → Gate)"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onStartFactory(card)
+          }}
+        >
+          <Factory className="size-3 text-primary mr-1 inline" />
+          <span>Factory</span>
+        </Button>
+      ) : null}
+
       {/* Quick Dispatch Action if not running */}
-      {isAgent && !isRunning && onDispatchAgent ? (
+      {isAgent && !isRunning && !isFactoryRunning && onDispatchAgent ? (
         <Button
           size="xs"
           variant="ghost"

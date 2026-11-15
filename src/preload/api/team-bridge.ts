@@ -1,13 +1,17 @@
 import { ipcRenderer } from 'electron'
 import type { PreloadApi } from '../api-types'
+import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
   TeamApi,
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
+  TeamFactoryEvent,
   TeamMailConfigInput,
   TeamRejectExecutionRequest,
+  TeamResolveFactoryGateRequest,
   TeamSendInvitationRequest,
-  TeamStartExecutionRequest
+  TeamStartExecutionRequest,
+  TeamStartFactoryRunRequest
 } from '../../shared/teamwork/team-ipc-types'
 import type {
   TeamActivityEntry,
@@ -34,6 +38,27 @@ export const teamApi: TeamApi = {
     ipcRenderer.on('team:executionEvent', listener)
     return () => {
       ipcRenderer.removeListener('team:executionEvent', listener)
+    }
+  },
+  getFactoryConfig: (projectId: string) => ipcRenderer.invoke('team:getFactoryConfig', projectId),
+  saveFactoryConfig: (config: FactoryConfig) =>
+    ipcRenderer.invoke('team:saveFactoryConfig', config),
+  startFactoryRun: (request: TeamStartFactoryRunRequest) =>
+    ipcRenderer.invoke('team:startFactoryRun', request),
+  cancelFactoryRun: (runId: string) => ipcRenderer.invoke('team:cancelFactoryRun', runId),
+  resolveFactoryHumanGate: (request: TeamResolveFactoryGateRequest) =>
+    ipcRenderer.invoke('team:resolveFactoryHumanGate', request),
+  getFactoryRun: (runId: string) => ipcRenderer.invoke('team:getFactoryRun', runId),
+  getLatestFactoryRunForCard: (cardId: string) =>
+    ipcRenderer.invoke('team:getLatestFactoryRunForCard', cardId),
+  listFactoryRuns: (projectId: string) => ipcRenderer.invoke('team:listFactoryRuns', projectId),
+  onFactoryEvent: (callback: (event: TeamFactoryEvent) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: TeamFactoryEvent): void => {
+      callback(payload)
+    }
+    ipcRenderer.on('team:factoryEvent', listener)
+    return () => {
+      ipcRenderer.removeListener('team:factoryEvent', listener)
     }
   },
   getWorkspaceSnapshot: () => ipcRenderer.invoke('team:getWorkspaceSnapshot'),

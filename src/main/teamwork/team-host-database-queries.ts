@@ -1,4 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { FactoryConfig, FactoryRunRecord } from '../../shared/teamwork/team-factory-types'
+import { createDefaultFactoryConfig } from '../../shared/teamwork/team-factory-types'
 import { mapProjectRow, mapTeamRow } from '../../shared/teamwork/team-row-mappers'
 import {
   isTeamRole,
@@ -98,4 +100,121 @@ export function queryWorkspaceSnapshot(db: DatabaseSync): TeamWorkspaceSnapshot 
   }
 
   return { teams, projects, membersByTeam, invitationsByTeam }
+}
+
+function isFactoryConfigShape(value: unknown): value is FactoryConfig {
+  return (
+    isRecord(value) &&
+    typeof value.projectId === 'string' &&
+    isRecord(value.specWriter) &&
+    isRecord(value.builder) &&
+    isRecord(value.reviewers) &&
+    isRecord(value.approver) &&
+    isRecord(value.deterministicRules)
+  )
+}
+
+function isFactoryRunShape(value: unknown): value is FactoryRunRecord {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.cardId === 'string' &&
+    typeof value.projectId === 'string' &&
+    Array.isArray(value.stages) &&
+    Array.isArray(value.reviews) &&
+    Array.isArray(value.logs)
+  )
+}
+
+export function queryFactoryConfig(db: DatabaseSync, projectId: string): FactoryConfig {
+  const row = db
+    .prepare('SELECT config_json FROM factory_configs WHERE project_id = ?')
+    .get(projectId)
+  if (isRecord(row) && typeof row.config_json === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(row.config_json)
+      if (isFactoryConfigShape(parsed)) {
+        return parsed
+      }
+    } catch {
+      // Fallback to default config.
+    }
+  }
+  return createDefaultFactoryConfig(projectId)
+}
+
+export function persistFactoryConfig(db: DatabaseSync, config: FactoryConfig): FactoryConfig {
+  const updated: FactoryConfig = { ...config, updatedAt: Date.now() }
+  db.prepare(
+    `INSERT INTO factory_configs (project_id, config_json, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(project_id) DO UPDATE SET
+       config_json = excluded.config_json,
+       updated_at = excluded.updated_at`
+  ).run(updated.projectId, JSON.stringify(updated), updated.updatedAt)
+  return updated
+}
+
+export function persistFactoryRun(db: DatabaseSync, run: FactoryRunRecord): void {
+  db.prepare(
+    `INSERT INTO factory_runs (
+       id, card_id, project_id, status, current_stage, run_json, started_at, completed_at, updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       status = excluded.status,
+       current_stage = excluded.current_stage,
+       run_json = excluded.run_json,
+       completed_at = excluded.completed_at,
+       updated_at = excluded.updated_at`
+  ).run(
+    run.id,
+    run.cardId,
+    run.projectId,
+    run.status,
+    run.currentStage,
+    JSON.stringify(run),
+    run.startedAt,
+    run.completedAt ?? null,
+    run.updatedAt
+  )
+}
+
+function parseFactoryRunRow(row: unknown): FactoryRunRecord | null {
+  if (!isRecord(row) || typeof row.run_json !== 'string') {
+    return null
+  }
+  try {
+    const parsed: unknown = JSON.parse(row.run_json)
+    return isFactoryRunShape(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function queryFactoryRun(db: DatabaseSync, runId: string): FactoryRunRecord | null {
+  const row = db.prepare('SELECT run_json FROM factory_runs WHERE id = ?').get(runId)
+  return parseFactoryRunRow(row)
+}
+
+export function queryLatestFactoryRunForCard(
+  db: DatabaseSync,
+  cardId: string
+): FactoryRunRecord | null {
+  const row = db
+    .prepare('SELECT run_json FROM factory_runs WHERE card_id = ? ORDER BY started_at DESC LIMIT 1')
+    .get(cardId)
+  return parseFactoryRunRow(row)
+}
+
+export function queryFactoryRunsForProject(
+  db: DatabaseSync,
+  projectId: string
+): FactoryRunRecord[] {
+  const rows = db
+    .prepare(
+      'SELECT run_json FROM factory_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT 50'
+    )
+    .all(projectId)
+  return rows.map(parseFactoryRunRow).filter((r): r is FactoryRunRecord => r !== null)
 }

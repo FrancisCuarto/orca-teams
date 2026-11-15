@@ -1,12 +1,16 @@
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
   TeamApi,
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
+  TeamFactoryEvent,
   TeamRejectExecutionRequest,
+  TeamResolveFactoryGateRequest,
   TeamSendInvitationRequest,
   TeamSendInvitationResult,
-  TeamStartExecutionRequest
+  TeamStartExecutionRequest,
+  TeamStartFactoryRunRequest
 } from '../../shared/teamwork/team-ipc-types'
 import type {
   AgentExecutionRecord,
@@ -18,6 +22,7 @@ import { listConfiguredTeamAgents } from '../teamwork/team-agent-discovery'
 import { TeamAgentRunner } from '../teamwork/team-agent-runner'
 import { TeamAuthService } from '../teamwork/team-auth-service'
 import { TeamEmailService } from '../teamwork/team-email-service'
+import { TeamFactoryRunner } from '../teamwork/team-factory-runner'
 import { TeamHostDatabase } from '../teamwork/team-host-database'
 import { TeamSyncRelayServer } from '../teamwork/team-sync-relay-server'
 import { registerTeamAuthSyncAndMailHandlers } from './team-workspace-ipc'
@@ -31,6 +36,14 @@ function broadcastExecutionEvent(event: TeamExecutionEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
       win.webContents.send('team:executionEvent', event)
+    }
+  }
+}
+
+function broadcastFactoryEvent(event: TeamFactoryEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('team:factoryEvent', event)
     }
   }
 }
@@ -106,11 +119,20 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
       })
     }
   })
+  const factoryRunner = new TeamFactoryRunner({
+    getFallbackHomeDir: () => app.getPath('home'),
+    loadConfig: (projectId) => db.getFactoryConfig(projectId),
+    onPersistRun: (run) => db.upsertFactoryRun(run),
+    onLookupRun: (runId) => db.getFactoryRun(runId),
+    onLookupLatestForCard: (cardId) => db.getLatestFactoryRunForCard(cardId),
+    onListRuns: (projectId) => db.listFactoryRuns(projectId)
+  })
 
   void syncServer.initializeFromPersistedSettings().catch(() => undefined)
 
   app.once('will-quit', () => {
     runner.dispose()
+    factoryRunner.dispose()
     void syncServer.stopHosting()
     db.close()
   })
@@ -189,6 +211,34 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
 
   ipcMain.handle('team:getLatestExecutionForCard', (_event, cardId: string) =>
     runner.getLatestExecutionForCard(cardId)
+  )
+
+  ipcMain.handle('team:getFactoryConfig', (_event, projectId: string) =>
+    db.getFactoryConfig(projectId)
+  )
+
+  ipcMain.handle('team:saveFactoryConfig', (_event, config: FactoryConfig) =>
+    db.saveFactoryConfig(config)
+  )
+
+  ipcMain.handle('team:startFactoryRun', (_event, request: TeamStartFactoryRunRequest) =>
+    factoryRunner.startRun(request, broadcastFactoryEvent)
+  )
+
+  ipcMain.handle('team:cancelFactoryRun', (_event, runId: string) => factoryRunner.cancelRun(runId))
+
+  ipcMain.handle('team:resolveFactoryHumanGate', (_event, request: TeamResolveFactoryGateRequest) =>
+    factoryRunner.resolveHumanGate(request)
+  )
+
+  ipcMain.handle('team:getFactoryRun', (_event, runId: string) => factoryRunner.getRun(runId))
+
+  ipcMain.handle('team:getLatestFactoryRunForCard', (_event, cardId: string) =>
+    factoryRunner.getLatestRunForCard(cardId)
+  )
+
+  ipcMain.handle('team:listFactoryRuns', (_event, projectId: string) =>
+    factoryRunner.listRuns(projectId)
   )
 
   ipcMain.handle('team:getWorkspaceSnapshot', () => db.getWorkspaceSnapshot())
