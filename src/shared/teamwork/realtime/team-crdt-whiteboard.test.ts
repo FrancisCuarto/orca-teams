@@ -163,4 +163,88 @@ describe('TeamWhiteboardCRDT', () => {
     clientA.destroy()
     clientB.destroy()
   })
+
+  it('sincroniza elementos shape, draw y arrow con points, strokeWidth y zIndex', () => {
+    const clientA = new TeamWhiteboardCRDT('wb-pro')
+    const clientB = new TeamWhiteboardCRDT('wb-pro')
+    clientA.initializeFromWhiteboard(createSampleWhiteboard())
+
+    const shapeItem: TeamWhiteboardItem = {
+      id: 'shape-1',
+      type: 'shape',
+      shapeKind: 'diamond',
+      x: 200,
+      y: 120,
+      width: 180,
+      height: 120,
+      content: 'Gateway API',
+      color: 'purple',
+      strokeColor: '#a855f7',
+      strokeWidth: 4,
+      fillStyle: 'tinted',
+      fontSize: 'md',
+      zIndex: 2
+    }
+    const drawItem: TeamWhiteboardItem = {
+      id: 'draw-1',
+      type: 'draw',
+      x: 50,
+      y: 60,
+      width: 120,
+      height: 80,
+      content: '',
+      strokeColor: '#3b82f6',
+      strokeWidth: 6,
+      points: [
+        { x: 0, y: 0 },
+        { x: 60, y: 40 },
+        { x: 120, y: 80 }
+      ],
+      zIndex: 3
+    }
+    const arrowItem: TeamWhiteboardItem = {
+      id: 'arrow-1',
+      type: 'arrow',
+      x: 100,
+      y: 150,
+      width: 100,
+      height: 30,
+      content: 'HTTP',
+      fromId: 'item-1',
+      toId: 'shape-1',
+      strokeColor: '#10b981',
+      strokeWidth: 2,
+      points: [
+        { x: 0, y: 15 },
+        { x: 100, y: 15 }
+      ],
+      endX: 200,
+      endY: 165,
+      zIndex: 4
+    }
+
+    clientA.upsertItem(shapeItem)
+    clientA.upsertItem(drawItem)
+    clientA.upsertItem(arrowItem)
+    clientB.applyUpdate(clientA.encodeStateAsUpdate())
+    const wbB = clientB.getWhiteboard()
+
+    expect(wbB.items.find((i) => i.id === 'shape-1')).toEqual(shapeItem)
+    expect(wbB.items.find((i) => i.id === 'draw-1')?.points).toEqual(drawItem.points)
+    expect(wbB.items.find((i) => i.id === 'draw-1')?.strokeWidth).toBe(6)
+    expect(wbB.items.find((i) => i.id === 'arrow-1')?.fromId).toBe('item-1')
+    expect(wbB.items.find((i) => i.id === 'arrow-1')?.toId).toBe('shape-1')
+    expect(wbB.items.find((i) => i.id === 'arrow-1')?.zIndex).toBe(4)
+
+    clientB.resizeItem('shape-1', 260, 180)
+    clientB.bringItemToFront('item-1')
+    clientA.applyUpdate(clientB.encodeStateAsUpdate())
+
+    const stateA = clientA.getWhiteboard()
+    expect(stateA.items.find((i) => i.id === 'shape-1')?.width).toBe(260)
+    expect(stateA.items.find((i) => i.id === 'item-1')?.zIndex).toBe(5)
+
+    clientA.destroy()
+    clientB.destroy()
+  })
 })

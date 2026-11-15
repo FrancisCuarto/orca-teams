@@ -1,18 +1,25 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Bot,
+  Check,
   CheckCircle2,
+  Copy,
   GitBranch,
   Loader2,
+  RotateCcw,
   StopCircle,
   Terminal,
   XCircle
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { getIntlLocale } from '@/i18n/i18n'
+import { copyTextToClipboard } from '../utils/team-clipboard'
 import type { AgentExecutionRecord } from '../../../../../shared/teamwork/team-workspace-types'
+import { buildKeyedExecutionLogs } from './team-kanban-execution-helpers'
 
 type Props = {
   open: boolean
@@ -20,13 +27,7 @@ type Props = {
   execution: AgentExecutionRecord | null
   onOpenChange: (open: boolean) => void
   onCancel?: (executionId: string) => void
-}
-
-function getStatusBadgeVariant(status: AgentExecutionRecord['status']): 'secondary' | 'outline' {
-  if (status === 'completed') {
-    return 'secondary'
-  }
-  return 'outline'
+  onRerun?: () => void
 }
 
 export function TeamAgentExecutionModal({
@@ -34,21 +35,50 @@ export function TeamAgentExecutionModal({
   cardTitle,
   execution,
   onOpenChange,
-  onCancel
+  onCancel,
+  onRerun
 }: Props): React.JSX.Element | null {
   const logsEndRef = useRef<HTMLDivElement>(null)
+  const [copiedLogs, setCopiedLogs] = useState(false)
 
   useEffect(() => {
-    if (open && logsEndRef.current) {
+    if (open && logsEndRef.current && typeof logsEndRef.current.scrollIntoView === 'function') {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [open, execution?.logs.length])
+
+  const keyedLogs = useMemo(
+    () => (execution ? buildKeyedExecutionLogs(execution.logs) : []),
+    [execution]
+  )
 
   if (!execution) {
     return null
   }
 
   const isRunning = execution.status === 'running' || execution.status === 'queued'
+  const intlLocale = getIntlLocale()
+
+  const handleCopyLogs = async (): Promise<void> => {
+    const text = execution.logs
+      .map((entry) => {
+        const time = new Date(entry.timestamp).toLocaleTimeString(intlLocale, {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+        return `[${time}] [${entry.level.toUpperCase()}] ${entry.message}`
+      })
+      .join('\n')
+    const ok = await copyTextToClipboard(text || execution.prompt)
+    if (ok) {
+      setCopiedLogs(true)
+      toast.success('Logs copiados al portapapeles')
+      setTimeout(() => setCopiedLogs(false), 1800)
+    } else {
+      toast.error('No se pudieron copiar los logs')
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,7 +93,6 @@ export function TeamAgentExecutionModal({
         </DialogHeader>
 
         <div className="space-y-3.5 py-1">
-          {/* Metadata Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-card/50 text-xs">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 font-medium text-foreground">
@@ -72,7 +101,6 @@ export function TeamAgentExecutionModal({
               </div>
               <div className="text-muted-foreground font-mono">({execution.model})</div>
             </div>
-
             <div className="flex items-center gap-2">
               {execution.branchOrWorktree && (
                 <div className="flex items-center gap-1 text-2xs font-mono text-muted-foreground">
@@ -80,8 +108,7 @@ export function TeamAgentExecutionModal({
                   <span>{execution.branchOrWorktree}</span>
                 </div>
               )}
-
-              <Badge variant={getStatusBadgeVariant(execution.status)}>
+              <Badge variant={execution.status === 'completed' ? 'secondary' : 'outline'}>
                 {isRunning && (
                   <Loader2 className="w-2.5 h-2.5 mr-1 inline animate-spin text-primary" />
                 )}
@@ -99,28 +126,40 @@ export function TeamAgentExecutionModal({
             </div>
           </div>
 
-          {/* Terminal Logs View */}
           <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-muted-foreground font-medium">
-              <Terminal className="w-3 h-3 text-primary" />
-              <span>Consola de Streaming de Logs</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-muted-foreground font-medium">
+                <Terminal className="w-3 h-3 text-primary" />
+                <span>Consola de Streaming de Logs</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => void handleCopyLogs()}
+                className="h-6 text-3xs gap-1"
+              >
+                {copiedLogs ? (
+                  <Check className="w-3 h-3 text-emerald-500" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+                {copiedLogs ? 'Copiado' : 'Copiar Logs'}
+              </Button>
             </div>
 
             <div className="overflow-y-auto scrollbar-sleek max-h-56 p-3 rounded-lg border border-border bg-card/90 font-mono text-2xs space-y-1">
-              {execution.logs.length === 0 ? (
+              {keyedLogs.length === 0 ? (
                 <div className="text-muted-foreground italic">Esperando primeros registros...</div>
               ) : (
-                execution.logs.map((log, index) => {
-                  const time = new Date(log.timestamp).toLocaleTimeString([], {
+                keyedLogs.map(({ key, log }) => {
+                  const time = new Date(log.timestamp).toLocaleTimeString(intlLocale, {
                     hour: '2-digit',
                     minute: '2-digit',
                     second: '2-digit'
                   })
                   return (
-                    <div
-                      key={`${log.timestamp}-${index}`}
-                      className="flex items-start gap-2 leading-relaxed"
-                    >
+                    <div key={key} className="flex items-start gap-2 leading-relaxed">
                       <span className="text-muted-foreground/60 shrink-0">{time}</span>
                       <span
                         className={
@@ -142,7 +181,6 @@ export function TeamAgentExecutionModal({
             </div>
           </div>
 
-          {/* Completed Summary / Error Output */}
           {execution.outputSummary && (
             <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-1 text-xs">
               <span className="text-2xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
@@ -176,7 +214,12 @@ export function TeamAgentExecutionModal({
               Cancelar Ejecución
             </Button>
           )}
-
+          {!isRunning && onRerun && (
+            <Button type="button" variant="secondary" size="sm" onClick={onRerun}>
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5 inline" />
+              Re-ejecutar
+            </Button>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>

@@ -1,63 +1,83 @@
 import React from 'react'
-import { Code, Eye, Move, Palette, Trash2 } from 'lucide-react'
+import { Code, Eye, KanbanSquare, Move, Palette, Trash2 } from 'lucide-react'
 import MermaidBlock from '@/components/editor/MermaidBlock'
 import { Button } from '@/components/ui/button'
-import type {
-  TeamWhiteboardItem,
-  WhiteboardColor
-} from '../../../../../shared/teamwork/team-kanban-types'
-
-const COLOR_CLASSES: Record<WhiteboardColor, { bg: string; border: string }> = {
-  yellow: { bg: 'bg-amber-500/15', border: 'border-amber-500/40' },
-  blue: { bg: 'bg-blue-500/15', border: 'border-blue-500/40' },
-  green: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/40' },
-  pink: { bg: 'bg-pink-500/15', border: 'border-pink-500/40' },
-  purple: { bg: 'bg-purple-500/15', border: 'border-purple-500/40' },
-  orange: { bg: 'bg-orange-500/15', border: 'border-orange-500/40' }
-}
+import type { TeamWhiteboardItem } from '../../../../../shared/teamwork/team-kanban-types'
+import { FONT_SIZE_CLASSES, resolveItemSwatch } from './whiteboard-types'
+import { TeamWhiteboardShapeCard } from './TeamWhiteboardShapeCard'
 
 type Props = {
   item: TeamWhiteboardItem
   posX: number
   posY: number
+  width: number
+  height: number
   isDark: boolean
+  isSelected: boolean
   isMermaidEdit: boolean
   onToggleMermaidEdit: () => void
   onMouseDown: (e: React.MouseEvent) => void
+  onResizeMouseDown: (e: React.MouseEvent) => void
   onUpdate: (updates: Partial<TeamWhiteboardItem>) => void
   onDelete: () => void
   onCycleColor: () => void
+  onCreateTask?: () => void
 }
 
 export function TeamWhiteboardCardItem({
   item,
   posX,
   posY,
+  width,
+  height,
   isDark,
+  isSelected,
   isMermaidEdit,
   onToggleMermaidEdit,
   onMouseDown,
+  onResizeMouseDown,
   onUpdate,
   onDelete,
-  onCycleColor
+  onCycleColor,
+  onCreateTask
 }: Props): React.JSX.Element {
+  if (item.type === 'shape') {
+    return (
+      <TeamWhiteboardShapeCard
+        item={item}
+        posX={posX}
+        posY={posY}
+        width={width}
+        height={height}
+        isSelected={isSelected}
+        onMouseDown={onMouseDown}
+        onResizeMouseDown={onResizeMouseDown}
+        onUpdate={onUpdate}
+      />
+    )
+  }
+
   const isMermaid = item.type === 'mermaid'
-  const colorClass = COLOR_CLASSES[item.color ?? 'yellow'] ?? COLOR_CLASSES.yellow
+  const swatch = resolveItemSwatch(item)
+  const fontClass = FONT_SIZE_CLASSES[item.fontSize ?? 'sm']
+  const selectionRing = isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
 
   return (
     <div
       data-whiteboard-item="true"
+      data-testid={`whiteboard-item-${item.id}`}
       onMouseDown={onMouseDown}
       style={{
         transform: `translate(${posX}px, ${posY}px)`,
-        width: `${item.width}px`,
-        minHeight: `${item.height}px`
+        width: `${width}px`,
+        minHeight: `${height}px`,
+        zIndex: (item.zIndex ?? 0) + 10,
+        ...(item.strokeColor && !isMermaid ? { borderColor: item.strokeColor } : {})
       }}
-      className={`absolute z-10 flex flex-col rounded-xl border backdrop-blur-md shadow-floating transition-shadow cursor-grab active:cursor-grabbing ${
-        isMermaid ? 'bg-card/90 border-border' : `${colorClass.bg} ${colorClass.border}`
+      className={`group absolute flex flex-col rounded-xl border backdrop-blur-md shadow-floating transition-shadow cursor-grab active:cursor-grabbing ${selectionRing} ${
+        isMermaid ? 'bg-card/90 border-border' : `${swatch.cardBgClass} ${swatch.cardBorderClass}`
       }`}
     >
-      {/* Item Card Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 gap-2">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <Move className="size-3 text-muted-foreground shrink-0" />
@@ -70,18 +90,23 @@ export function TeamWhiteboardCardItem({
           />
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {!isMermaid && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onCreateTask && (
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={onCycleColor}
-              title="Cambiar color de la tarjeta"
+              onClick={onCreateTask}
+              title="Crear Tarea"
+              aria-label="Crear Tarea"
             >
-              <Palette />
+              <KanbanSquare className="size-3.5 text-git-graph-lane-2" />
             </Button>
           )}
-
+          {!isMermaid && (
+            <Button size="icon-xs" variant="ghost" onClick={onCycleColor} title="Cambiar color">
+              <Palette className="size-3.5" />
+            </Button>
+          )}
           {isMermaid && (
             <Button
               size="icon-xs"
@@ -89,17 +114,15 @@ export function TeamWhiteboardCardItem({
               onClick={onToggleMermaidEdit}
               title={isMermaidEdit ? 'Ver Renderizado' : 'Editar Código Mermaid'}
             >
-              {isMermaidEdit ? <Eye /> : <Code />}
+              {isMermaidEdit ? <Eye className="size-3.5" /> : <Code className="size-3.5" />}
             </Button>
           )}
-
           <Button size="icon-xs" variant="ghost" onClick={onDelete} title="Eliminar Elemento">
-            <Trash2 />
+            <Trash2 className="size-3.5" />
           </Button>
         </div>
       </div>
 
-      {/* Item Card Content */}
       <div className="flex flex-col flex-1 p-3 select-text">
         {isMermaid ? (
           isMermaidEdit ? (
@@ -120,11 +143,20 @@ export function TeamWhiteboardCardItem({
             value={item.content}
             onChange={(e) => onUpdate({ content: e.target.value })}
             rows={5}
-            className="w-full flex-1 bg-transparent text-xs leading-relaxed text-foreground resize-none focus:outline-hidden placeholder:text-muted-foreground/60"
+            className={`w-full flex-1 bg-transparent leading-relaxed text-foreground resize-none focus:outline-hidden placeholder:text-muted-foreground/60 ${fontClass}`}
             placeholder="Escribe tu nota aquí..."
           />
         )}
       </div>
+
+      <div
+        data-testid={`resize-handle-${item.id}`}
+        onMouseDown={onResizeMouseDown}
+        title="Redimensionar"
+        className={`absolute -bottom-1.5 -right-1.5 z-20 size-3.5 rounded-xs bg-primary border border-background cursor-nwse-resize shadow-xs transition-opacity ${
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}
+      />
     </div>
   )
 }

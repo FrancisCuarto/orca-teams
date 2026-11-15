@@ -4,6 +4,7 @@ import type {
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { TeamMemberEntry } from '../../../../../shared/teamwork/team-members'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ type Props = {
   card: TeamKanbanCard | null
   columns: TeamKanbanColumn[]
   defaultColumnId?: string
+  configuredAgents?: TeamMemberEntry[]
+  humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
   onClose: () => void
   onSave: (card: TeamKanbanCard) => void
@@ -30,6 +33,8 @@ export function TeamKanbanCardModal({
   card,
   columns,
   defaultColumnId,
+  configuredAgents,
+  humanMembers,
   availableMembers,
   onClose,
   onSave,
@@ -42,8 +47,8 @@ export function TeamKanbanCardModal({
         <DialogHeader>
           <DialogTitle>{card ? 'Editar Tarea' : 'Nueva Tarea de Equipo'}</DialogTitle>
           <DialogDescription>
-            Define los requerimientos, asigna un miembro humano o un agente de IA, y gestiona los
-            criterios de aceptación.
+            Define los requerimientos, asigna un miembro humano o un agente de IA configurado, y
+            gestiona los criterios de aceptación.
           </DialogDescription>
         </DialogHeader>
 
@@ -53,6 +58,8 @@ export function TeamKanbanCardModal({
             card={card}
             columns={columns}
             defaultColumnId={defaultColumnId}
+            configuredAgents={configuredAgents}
+            humanMembers={humanMembers}
             availableMembers={availableMembers}
             onClose={onClose}
             onSave={onSave}
