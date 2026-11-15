@@ -138,4 +138,123 @@ describe('team-agent-runner', () => {
     expect(cancelled?.status).toBe('cancelled')
     runner.dispose()
   })
+
+  it('collects structured git diff and truncates oversized diffs in getExecutionDiff', async () => {
+    const tmpWorktree = process.cwd()
+    const oversizedDiff = `diff --git a/src/app.ts b/src/app.ts\n@@ -1,1 +1,2 @@\n-old\n+${'x'.repeat(130_000)}\n`
+    const runner = new TeamAgentRunner({
+      hydrateShellPath: async () => undefined,
+      resolveExecutable: async () => process.execPath,
+      provisionWorktree: async () => ({
+        isGitRepo: true,
+        workDir: tmpWorktree,
+        branch: 'orca-team/card-diff-test',
+        baseBranch: 'main'
+      }),
+      runGitCommand: async (_cwd, args) => {
+        if (args[0] === 'merge-base') {
+          return { code: 0, stdout: 'abc123\n', stderr: '' }
+        }
+        if (args[0] === 'diff' && args[1] === '--numstat') {
+          return { code: 0, stdout: '10\t2\tsrc/app.ts\n', stderr: '' }
+        }
+        if (args[0] === 'diff' && args[1] === '--name-status') {
+          return { code: 0, stdout: 'M\tsrc/app.ts\n', stderr: '' }
+        }
+        if (args[0] === 'diff' && args[1] === '--no-color') {
+          return { code: 0, stdout: oversizedDiff, stderr: '' }
+        }
+        if (args[0] === 'ls-files') {
+          return { code: 0, stdout: '', stderr: '' }
+        }
+        return { code: 1, stdout: '', stderr: 'unexpected' }
+      },
+      spawnProcess: (_bin, _args, opts) =>
+        spawn(process.execPath, ['-e', "console.log('done')"], {
+          cwd: opts.cwd,
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+    })
+
+    const rec = await runner.startExecution(
+      {
+        card: makeCard({ id: 'card-diff', requiresApproval: true }),
+        projectId: 'proj-1',
+        projectPath: tmpWorktree,
+        actorUserId: 'usr-1'
+      },
+      () => undefined
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    const diff = await runner.getExecutionDiff(rec.id)
+    expect(diff.error).toBeUndefined()
+    expect(diff.files).toEqual([
+      { path: 'src/app.ts', status: 'modified', additions: 10, deletions: 2 }
+    ])
+    expect(diff.truncated).toBe(true)
+    expect(diff.diff.length).toBeLessThanOrEqual(120_000)
+  })
+
+  it('validates status/feedback and re-launches in existing worktree on requestExecutionChanges', async () => {
+    const tmpWorktree = process.cwd()
+    const launchedCwds: string[] = []
+    const launchedArgs: string[][] = []
+    const runner = new TeamAgentRunner({
+      hydrateShellPath: async () => undefined,
+      resolveExecutable: async () => process.execPath,
+      provisionWorktree: async () => ({
+        isGitRepo: true,
+        workDir: tmpWorktree,
+        branch: 'orca-team/card-reprompt',
+        baseBranch: 'main'
+      }),
+      inspectWorktreeChanges: async () => ['M src/app.ts'],
+      spawnProcess: (_bin, args, opts) => {
+        launchedCwds.push(opts.cwd)
+        launchedArgs.push(args)
+        return spawn(process.execPath, ['-e', "console.log('reprompt ok')"], {
+          cwd: opts.cwd,
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+      }
+    })
+
+    const started = await runner.startExecution(
+      {
+        card: makeCard({ id: 'card-reprompt', requiresApproval: true }),
+        projectId: 'proj-1',
+        projectPath: tmpWorktree,
+        actorUserId: 'usr-1'
+      },
+      () => undefined
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(runner.getExecution(started.id)?.status).toBe('waiting_for_input')
+
+    await expect(
+      runner.requestExecutionChanges({ executionId: started.id, feedback: '   ' })
+    ).rejects.toThrow(/instrucciones/i)
+
+    const relaunched = await runner.requestExecutionChanges({
+      executionId: started.id,
+      feedback: 'Agrega validación para entradas vacías',
+      actorName: 'Francis'
+    })
+    expect(relaunched?.status).toBe('running')
+    expect(relaunched?.worktreePath).toBe(tmpWorktree)
+    expect(relaunched?.branchOrWorktree).toBe('orca-team/card-reprompt')
+    expect(relaunched?.prompt).toContain('Agrega validación para entradas vacías')
+    expect(launchedCwds).toEqual([tmpWorktree, tmpWorktree])
+    expect(launchedArgs[1]?.some((arg) => arg.includes('Agrega validación para entradas vacías'))).toBe(
+      true
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    const finalRecord = runner.getExecution(started.id)
+    expect(finalRecord?.status).toBe('waiting_for_input')
+    expect(finalRecord?.approvalStatus).toBe('pending')
+  })
 })

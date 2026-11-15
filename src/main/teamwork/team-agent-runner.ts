@@ -4,8 +4,10 @@ import { homedir } from 'node:os'
 import type { AgentExecutionRecord } from '../../shared/teamwork/team-workspace-types'
 import type {
   TeamApproveExecutionRequest,
+  TeamExecutionDiffResult,
   TeamExecutionEvent,
   TeamRejectExecutionRequest,
+  TeamRequestExecutionChangesRequest,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
 import { hydrateShellPathForAgentDetection } from '../ipc/command-path/agent-detection-shell-path'
@@ -16,7 +18,13 @@ import {
   extractCardAgentAssignment,
   resolveAgentCommand
 } from './team-agent-command'
-import { applyExecutionApproval, applyExecutionRejection } from './team-agent-approval'
+import {
+  applyExecutionApproval,
+  applyExecutionRejection,
+  inspectExecutionDiff,
+  prepareExecutionChangeRequest,
+  type RunGitCommandFn
+} from './team-agent-approval'
 import {
   appendExecutionLog,
   cloneExecutionRecord,
@@ -51,6 +59,7 @@ export type TeamAgentRunnerDeps = {
     preferredBranch?: string
   }) => Promise<ProvisionedWorktree>
   inspectWorktreeChanges?: (worktreePath: string) => Promise<string[]>
+  runGitCommand?: RunGitCommandFn
   mergeWorktreeToBase?: typeof mergeWorktreeToBase
   discardWorktree?: typeof discardCardWorktree
   onPersistExecution?: (record: AgentExecutionRecord) => void
@@ -107,23 +116,6 @@ export class TeamAgentRunner {
     this.listeners.set(executionId, onEvent)
     this.emitUpdated(record)
 
-    const hydrate = this.deps.hydrateShellPath ?? (() => hydrateShellPathForAgentDetection())
-    const resolveExec =
-      this.deps.resolveExecutable ?? ((cmd: string) => resolveCommandOnLocalPath(cmd))
-    await hydrate()
-    const resolvedBin = await resolveExec(command)
-
-    if (!resolvedBin) {
-      record.status = 'failed'
-      record.error = `No se encontró el binario '${command}' en PATH.`
-      record.completedAt = Date.now()
-      record.updatedAt = record.completedAt
-      appendExecutionLog(record, 'error', record.error)
-      this.emitUpdated(record)
-      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
-      return cloneExecutionRecord(record)
-    }
-
     let workingDirInput = req.projectPath
     if (isolateWorktree && req.projectPath?.trim()) {
       const provisioner = this.deps.provisionWorktree ?? provisionCardWorktree
@@ -157,55 +149,70 @@ export class TeamAgentRunner {
       }
     }
 
-    const cli = buildAgentCliCommand(resolvedBin, prompt, model)
-    const cwd = resolveWorkingDirectory(
+    await this.launchExecutionProcess({
+      record,
+      command,
+      model,
       workingDirInput,
-      this.deps.getFallbackHomeDir ? this.deps.getFallbackHomeDir() : homedir()
-    )
+      requiresApproval,
+      launchActionLabel: 'Ejecutando'
+    })
 
-    record.status = 'running'
-    record.startedAt = Date.now()
-    record.updatedAt = record.startedAt
-    appendExecutionLog(record, 'info', `Ejecutando: ${command} en ${cwd}`)
-    this.emitUpdated(record)
+    return cloneExecutionRecord(record)
+  }
 
-    const spawnFn =
-      this.deps.spawnProcess ??
-      ((bin, args, opts) =>
-        spawn(bin, args, {
-          cwd: opts.cwd,
-          env: opts.env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          windowsHide: true
-        }))
-
-    const inspectFn = this.deps.inspectWorktreeChanges ?? inspectWorktreeChanges
-
-    try {
-      const child = spawnFn(cli.bin, cli.args, { cwd, env: { ...process.env } })
-      this.activeProcesses.set(executionId, child)
-      const worktreePath = record.worktreePath
-      wireAgentChildProcess({
+  async getExecutionDiff(executionId: string): Promise<TeamExecutionDiffResult> {
+    const record = this.getExecution(executionId)
+    if (!record) {
+      return {
         executionId,
-        record,
-        child,
-        requiresApproval,
-        inspectChanges: worktreePath ? () => inspectFn(worktreePath) : undefined,
-        isCancelled: () => this.cancelledIds.has(executionId),
-        onFinishProcess: () => this.activeProcesses.delete(executionId),
-        onEmitUpdated: () => this.emitUpdated(record),
-        onNotifyOutcome: () => this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      record.status = 'failed'
-      record.error = `Error al iniciar '${command}': ${message}`
-      record.completedAt = Date.now()
-      record.updatedAt = record.completedAt
-      appendExecutionLog(record, 'error', record.error)
-      this.emitUpdated(record)
-      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
+        files: [],
+        diff: '',
+        truncated: false,
+        error: 'Ejecución no encontrada.'
+      }
     }
+    return inspectExecutionDiff({
+      record,
+      runGitFn: this.deps.runGitCommand
+    })
+  }
+
+  async requestExecutionChanges(
+    request: TeamRequestExecutionChangesRequest,
+    onEvent?: (event: TeamExecutionEvent) => void
+  ): Promise<AgentExecutionRecord | null> {
+    const record = this.loadMutableExecution(request.executionId)
+    if (!record) {
+      return null
+    }
+    if (onEvent) {
+      this.listeners.set(record.id, onEvent)
+    }
+    if (this.activeProcesses.has(record.id)) {
+      throw new Error('La ejecución ya tiene un proceso activo en curso.')
+    }
+
+    const { requiresApproval } = prepareExecutionChangeRequest({
+      record,
+      request,
+      onPersistAndEmit: (updated) => this.emitUpdated(updated)
+    })
+
+    this.cancelledIds.delete(record.id)
+    this.latestByCard.set(record.taskId, record.id)
+
+    const command = record.agentType.trim() || resolveAgentCommand(record.agentId)
+    const model = record.model && record.model !== 'default' ? record.model : undefined
+
+    await this.launchExecutionProcess({
+      record,
+      command,
+      model,
+      workingDirInput: record.worktreePath,
+      requiresApproval,
+      launchActionLabel: 'Re-ejecutando con correcciones'
+    })
 
     return cloneExecutionRecord(record)
   }
@@ -236,6 +243,83 @@ export class TeamAgentRunner {
       discardWorktreeFn: this.deps.discardWorktree,
       onPersistAndEmit: (updated) => this.emitUpdated(updated)
     })
+  }
+
+  private async launchExecutionProcess(options: {
+    record: AgentExecutionRecord
+    command: string
+    model?: string
+    workingDirInput?: string | null
+    requiresApproval: boolean
+    launchActionLabel: string
+  }): Promise<void> {
+    const { record, command, model, workingDirInput, requiresApproval, launchActionLabel } = options
+    const hydrate = this.deps.hydrateShellPath ?? (() => hydrateShellPathForAgentDetection())
+    const resolveExec =
+      this.deps.resolveExecutable ?? ((cmd: string) => resolveCommandOnLocalPath(cmd))
+    await hydrate()
+    const resolvedBin = await resolveExec(command)
+
+    if (!resolvedBin) {
+      record.status = 'failed'
+      record.error = `No se encontró el binario '${command}' en PATH.`
+      record.completedAt = Date.now()
+      record.updatedAt = record.completedAt
+      appendExecutionLog(record, 'error', record.error)
+      this.emitUpdated(record)
+      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
+      return
+    }
+
+    const cli = buildAgentCliCommand(resolvedBin, record.prompt, model)
+    const cwd = resolveWorkingDirectory(
+      workingDirInput,
+      this.deps.getFallbackHomeDir ? this.deps.getFallbackHomeDir() : homedir()
+    )
+
+    record.status = 'running'
+    record.startedAt = Date.now()
+    record.updatedAt = record.startedAt
+    appendExecutionLog(record, 'info', `${launchActionLabel}: ${command} en ${cwd}`)
+    this.emitUpdated(record)
+
+    const spawnFn =
+      this.deps.spawnProcess ??
+      ((bin, args, opts) =>
+        spawn(bin, args, {
+          cwd: opts.cwd,
+          env: opts.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true
+        }))
+
+    const inspectFn = this.deps.inspectWorktreeChanges ?? inspectWorktreeChanges
+
+    try {
+      const child = spawnFn(cli.bin, cli.args, { cwd, env: { ...process.env } })
+      this.activeProcesses.set(record.id, child)
+      const worktreePath = record.worktreePath
+      wireAgentChildProcess({
+        executionId: record.id,
+        record,
+        child,
+        requiresApproval,
+        inspectChanges: worktreePath ? () => inspectFn(worktreePath) : undefined,
+        isCancelled: () => this.cancelledIds.has(record.id),
+        onFinishProcess: () => this.activeProcesses.delete(record.id),
+        onEmitUpdated: () => this.emitUpdated(record),
+        onNotifyOutcome: () => this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      record.status = 'failed'
+      record.error = `Error al iniciar '${command}': ${message}`
+      record.completedAt = Date.now()
+      record.updatedAt = record.completedAt
+      appendExecutionLog(record, 'error', record.error)
+      this.emitUpdated(record)
+      this.deps.onNotifyOutcome?.(cloneExecutionRecord(record))
+    }
   }
 
   private loadMutableExecution(executionId: string): AgentExecutionRecord | null {

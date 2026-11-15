@@ -48,6 +48,13 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     cancelExecution: vi.fn(async () => null),
     approveExecution: vi.fn(async () => null),
     rejectExecution: vi.fn(async () => null),
+    getExecutionDiff: vi.fn(async (executionId: string) => ({
+      executionId,
+      files: [],
+      diff: '',
+      truncated: false
+    })),
+    requestExecutionChanges: vi.fn(async () => null),
     getExecution: vi.fn(async () => null),
     getLatestExecutionForCard: vi.fn(async () => null),
     onExecutionEvent: vi.fn(noopUnsub),

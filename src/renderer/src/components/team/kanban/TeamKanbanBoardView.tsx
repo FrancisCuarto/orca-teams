@@ -87,6 +87,8 @@ export function TeamKanbanBoardView({
     cancelExecution,
     approveExecution,
     rejectExecution,
+    getExecutionDiff,
+    requestExecutionChanges,
     hydrateLatestForCard
   } = useTeamAgentExecutions()
   const factory = useTeamFactory(resolvedProjectId)
@@ -411,6 +413,31 @@ export function TeamKanbanBoardView({
             })
           }
         }}
+        onLoadDiff={getExecutionDiff}
+        onRequestChanges={
+          canDispatchAgents
+            ? async (executionId, feedback) => {
+                try {
+                  const updated = await requestExecutionChanges({
+                    executionId,
+                    feedback,
+                    actorUserId: currentUserId,
+                    actorName: currentUserName
+                  })
+                  if (updated) {
+                    toast.info('Agente re-lanzado con tus correcciones')
+                  }
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : 'No se pudo solicitar corrección al agente'
+                  )
+                  throw err
+                }
+              }
+            : undefined
+        }
         onRerun={
           executionModalCard && canDispatchAgents
             ? () => void actions.triggerImmediateExecution(executionModalCard)

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
+import type { TeamExecutionDiffResult } from '../../../../../shared/teamwork/team-ipc-types'
 import type { AgentExecutionRecord } from '../../../../../shared/teamwork/team-workspace-types'
 
 function createSampleExecution(status: AgentExecutionRecord['status']): AgentExecutionRecord {
@@ -122,5 +123,73 @@ describe('TeamAgentExecutionModal', () => {
 
     fireEvent.click(screen.getByText('Rechazar y Descartar Worktree'))
     expect(onReject).toHaveBeenCalledWith('exec-test-1', true)
+  })
+
+  it('carga y renderiza chips de archivos y diff unificado en la pestaña Cambios (Diff)', async () => {
+    const execution: AgentExecutionRecord = {
+      ...createSampleExecution('waiting_for_input'),
+      worktreePath: '/tmp/repo/.orca/team-worktrees/card-1',
+      baseBranch: 'main',
+      approvalStatus: 'pending'
+    }
+    const onLoadDiff = vi.fn(
+      async (executionId: string): Promise<TeamExecutionDiffResult> => ({
+        executionId,
+        worktreePath: '/tmp/repo/.orca/team-worktrees/card-1',
+        baseBranch: 'main',
+        branch: 'orca-team/card-1',
+        files: [{ path: 'src/App.tsx', status: 'modified', additions: 2, deletions: 1 }],
+        diff: 'diff --git a/src/App.tsx b/src/App.tsx\n@@ -1,2 +1,3 @@\n-const a = 1\n+const a = 2\n+const b = 3',
+        truncated: false
+      })
+    )
+
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Revisar Diff"
+        execution={execution}
+        onOpenChange={vi.fn()}
+        onLoadDiff={onLoadDiff}
+      />
+    )
+
+    const diffTab = screen.getByRole('tab', { name: /Cambios \(Diff\)/i })
+    fireEvent.mouseDown(diffTab, { button: 0 })
+    fireEvent.click(diffTab)
+
+    await waitFor(() => {
+      expect(onLoadDiff).toHaveBeenCalledWith('exec-test-1')
+      expect(screen.getByText('src/App.tsx')).toBeDefined()
+      expect(screen.getByText('+2')).toBeDefined()
+      expect(screen.getByText('-1')).toBeDefined()
+      expect(screen.getByText('+const b = 3')).toBeDefined()
+    })
+  })
+
+  it('permite enviar instrucciones de corrección mediante Pedir corrección', async () => {
+    const execution = createSampleExecution('completed')
+    const onRequestChanges = vi.fn(async () => undefined)
+
+    render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Corregir endpoint"
+        execution={execution}
+        onOpenChange={vi.fn()}
+        onRequestChanges={onRequestChanges}
+      />
+    )
+
+    const textarea = screen.getByPlaceholderText(/agrega manejo de errores/i)
+    fireEvent.change(textarea, { target: { value: 'Valida también el parámetro limit' } })
+    fireEvent.click(screen.getByRole('button', { name: /Pedir corrección/i }))
+
+    await waitFor(() => {
+      expect(onRequestChanges).toHaveBeenCalledWith(
+        'exec-test-1',
+        'Valida también el parámetro limit'
+      )
+    })
   })
 })
