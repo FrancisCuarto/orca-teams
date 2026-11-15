@@ -5,10 +5,12 @@ import type {
   TeamAddCardCommentRequest,
   TeamApi,
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
   TeamDeepLinkJoinPayload,
   TeamExecutionEvent,
   TeamFactoryEvent,
   TeamMailConfigInput,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamRequestExecutionChangesRequest,
   TeamResolveFactoryGateRequest,
@@ -29,6 +31,10 @@ export const teamApi: TeamApi = {
   cancelExecution: (executionId: string) => ipcRenderer.invoke('team:cancelExecution', executionId),
   approveExecution: (request: TeamApproveExecutionRequest) =>
     ipcRenderer.invoke('team:approveExecution', request),
+  createReviewRequest: (request: TeamCreateReviewRequestRequest) =>
+    ipcRenderer.invoke('team:createReviewRequest', request),
+  refreshReviewRequest: (request: TeamRefreshReviewRequestRequest) =>
+    ipcRenderer.invoke('team:refreshReviewRequest', request),
   rejectExecution: (request: TeamRejectExecutionRequest) =>
     ipcRenderer.invoke('team:rejectExecution', request),
   getExecutionDiff: (executionId: string) =>

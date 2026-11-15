@@ -1,3 +1,5 @@
+import type { TeamReviewRequest } from './team-workspace-types'
+
 export type TeamKanbanPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 export type TeamKanbanAssignee = {
@@ -59,6 +61,7 @@ export type TeamKanbanCard = {
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
+  reviewRequest?: TeamReviewRequest
   estimatePoints?: number
   blockedReason?: string
   dueDate?: string

@@ -129,4 +129,80 @@ describe('TeamAuthService, TeamActivityService & Approval Gate', () => {
     expect(approved?.approvalStatus).toBe('approved')
     expect(mergedBranch).toBe('orca-team/card-1-demo')
   })
+
+  it('creates a GitLab/GitHub review request on approval and refreshes its state', async () => {
+    const runner = new TeamAgentRunner({
+      hydrateShellPath: async () => undefined,
+      resolveExecutable: async () => '/usr/bin/claude',
+      getFallbackHomeDir: () => tmpdir(),
+      provisionWorktree: async () => ({
+        isGitRepo: true,
+        workDir: tmpdir(),
+        branch: 'orca-team/card-pr-demo',
+        baseBranch: 'main'
+      }),
+      inspectWorktreeChanges: async () => ['M src/app.ts'],
+      createReviewRequest: async () => ({
+        provider: 'gitlab',
+        number: 77,
+        url: 'https://gitlab.com/org/repo/-/merge_requests/77',
+        state: 'open'
+      }),
+      queryReviewRequestState: async ({ reviewRequest }) => ({
+        ...reviewRequest,
+        state: 'merged'
+      }),
+      spawnProcess: () => spawnShortProcess()
+    })
+
+    const started = await runner.startExecution(
+      {
+        card: {
+          id: 'card-pr',
+          title: 'Abrir MR',
+          description: 'Test',
+          columnId: 'col-in-progress',
+          priority: 'high',
+          assignee: { type: 'agent', name: 'Claude', agentType: 'claude' },
+          labels: [],
+          checklist: [],
+          requiresApproval: true,
+          isolateWorktree: true,
+          createdAt: 1,
+          updatedAt: 1
+        },
+        projectId: 'proj-1',
+        projectPath: tmpdir(),
+        actorUserId: 'usr-1'
+      },
+      () => undefined
+    )
+
+    const deadline = Date.now() + 3000
+    while (
+      runner.getExecution(started.id)?.status !== 'waiting_for_input' &&
+      Date.now() < deadline
+    ) {
+      await new Promise((r) => setTimeout(r, 20))
+    }
+
+    const approved = await runner.approveExecution({
+      executionId: started.id,
+      createPullRequestOnApprove: true,
+      actorName: 'Lead'
+    })
+    expect(approved?.approvalStatus).toBe('approved')
+    expect(approved?.reviewRequest).toEqual({
+      provider: 'gitlab',
+      number: 77,
+      url: 'https://gitlab.com/org/repo/-/merge_requests/77',
+      state: 'open'
+    })
+
+    const refreshed = await runner.refreshReviewRequest({
+      executionId: started.id,
+      actorName: 'Lead'
+    })
+    expect(refreshed?.reviewRequest?.state).toBe('merged')
+  })
 })

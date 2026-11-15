@@ -1,9 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type {
-  AgentApprovalStatus,
-  AgentExecutionLog,
-  AgentExecutionRecord,
-  AgentExecutionStatus
+import {
+  isTeamReviewRequest,
+  type AgentApprovalStatus,
+  type AgentExecutionLog,
+  type AgentExecutionRecord,
+  type AgentExecutionStatus,
+  type TeamReviewRequest
 } from './team-workspace-types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -66,6 +68,18 @@ function parseChangedFiles(raw: unknown): string[] | undefined {
   }
 }
 
+function parseReviewRequest(raw: unknown): TeamReviewRequest | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return undefined
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return isTeamReviewRequest(parsed) ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export class TeamExecutionService {
   constructor(private readonly db: DatabaseSync) {}
 
@@ -82,9 +96,9 @@ export class TeamExecutionService {
       `INSERT INTO agent_executions (
         id, task_id, project_id, agent_id, agent_type, model, status,
         prompt, branch_or_worktree, worktree_path, base_branch, approval_status,
-        changed_files_json, output_summary, idempotency_key, logs_json,
+        changed_files_json, review_request_json, output_summary, idempotency_key, logs_json,
         started_at, completed_at, error, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
     stmt.run(
@@ -101,6 +115,7 @@ export class TeamExecutionService {
       record.baseBranch ?? null,
       record.approvalStatus ?? null,
       record.changedFiles ? JSON.stringify(record.changedFiles) : null,
+      record.reviewRequest ? JSON.stringify(record.reviewRequest) : null,
       record.outputSummary ?? null,
       record.idempotencyKey,
       JSON.stringify(record.logs),
@@ -227,6 +242,7 @@ export class TeamExecutionService {
       baseBranch: row.base_branch ? String(row.base_branch) : undefined,
       approvalStatus: isApprovalStatus(row.approval_status) ? row.approval_status : undefined,
       changedFiles: parseChangedFiles(row.changed_files_json),
+      reviewRequest: parseReviewRequest(row.review_request_json),
       outputSummary: row.output_summary ? String(row.output_summary) : undefined,
       idempotencyKey: String(row.idempotency_key),
       logs: parseExecutionLogs(row.logs_json),

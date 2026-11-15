@@ -62,7 +62,8 @@ export class TeamDatabaseService {
       ['worktree_path', 'TEXT'],
       ['base_branch', 'TEXT'],
       ['approval_status', 'TEXT'],
-      ['changed_files_json', 'TEXT']
+      ['changed_files_json', 'TEXT'],
+      ['review_request_json', 'TEXT']
     ]
     for (const [name, colType] of additions) {
       if (!existing.has(name)) {

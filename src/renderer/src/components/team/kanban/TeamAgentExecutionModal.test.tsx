@@ -192,4 +192,60 @@ describe('TeamAgentExecutionModal', () => {
       )
     })
   })
+
+  it('muestra la opción Aprobar y abrir PR/MR y el enlace con Actualizar estado', () => {
+    const waitingExecution: AgentExecutionRecord = {
+      ...createSampleExecution('waiting_for_input'),
+      worktreePath: '/tmp/repo/.orca/team-worktrees/card-1',
+      baseBranch: 'main',
+      approvalStatus: 'pending'
+    }
+    const onApproveAndCreateReview = vi.fn()
+
+    const { rerender } = render(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Aprobar PR"
+        execution={waitingExecution}
+        onOpenChange={vi.fn()}
+        onApprove={vi.fn()}
+        onApproveAndCreateReview={onApproveAndCreateReview}
+      />
+    )
+
+    fireEvent.click(screen.getByText('Aprobar y abrir PR/MR'))
+    expect(onApproveAndCreateReview).toHaveBeenCalledWith('exec-test-1')
+
+    const withReviewExecution: AgentExecutionRecord = {
+      ...createSampleExecution('completed'),
+      approvalStatus: 'approved',
+      reviewRequest: {
+        provider: 'gitlab',
+        number: 55,
+        url: 'https://gitlab.com/org/repo/-/merge_requests/55',
+        state: 'open'
+      }
+    }
+    const onRefreshReviewRequest = vi.fn()
+
+    rerender(
+      <TeamAgentExecutionModal
+        open={true}
+        cardTitle="Aprobar PR"
+        execution={withReviewExecution}
+        onOpenChange={vi.fn()}
+        onRefreshReviewRequest={onRefreshReviewRequest}
+      />
+    )
+
+    expect(screen.getByText('GitLab MR #55')).toBeDefined()
+    expect(screen.getByText('Abierto')).toBeDefined()
+    const link = screen.getByRole('link', {
+      name: /gitlab\.com\/org\/repo\/-\/merge_requests\/55/i
+    })
+    expect(link.getAttribute('href')).toBe('https://gitlab.com/org/repo/-/merge_requests/55')
+
+    fireEvent.click(screen.getByText('Actualizar estado'))
+    expect(onRefreshReviewRequest).toHaveBeenCalledWith('exec-test-1')
+  })
 })

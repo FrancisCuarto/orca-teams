@@ -4,6 +4,7 @@ import type {
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { TeamReviewRequest } from '../../../../../shared/teamwork/team-workspace-types'
 
 export type BoardSprintMetrics = {
   totalCards: number
@@ -272,6 +273,53 @@ export function extractActionItemsFromMarkdownToBoard(
   }
 
   return { nextBoard, createdCount }
+}
+
+export function resolveDoneColumnId(board: TeamKanbanBoard): string | undefined {
+  return (
+    board.columns.find((col) => col.id === 'col-done' || col.id === 'done')?.id ??
+    board.columns.find((col) => {
+      const lower = col.title.trim().toLowerCase()
+      return lower === 'completado' || lower === 'done'
+    })?.id ??
+    board.columns.at(-1)?.id
+  )
+}
+
+export function applyReviewRequestToKanbanCard(
+  board: TeamKanbanBoard,
+  cardId: string,
+  reviewRequest: TeamReviewRequest
+): { nextBoard: TeamKanbanBoard; movedToDone: boolean } {
+  const existingCard = board.cards[cardId]
+  if (!existingCard) {
+    return { nextBoard: board, movedToDone: false }
+  }
+  const now = Date.now()
+  const updatedCard: TeamKanbanCard = {
+    ...existingCard,
+    reviewRequest,
+    updatedAt: now
+  }
+  let nextBoard: TeamKanbanBoard = {
+    ...board,
+    cards: { ...board.cards, [cardId]: updatedCard },
+    updatedAt: now
+  }
+
+  let movedToDone = false
+  if (reviewRequest.state === 'merged') {
+    const doneColumnId = resolveDoneColumnId(nextBoard)
+    if (doneColumnId && updatedCard.columnId !== doneColumnId) {
+      const moved = moveKanbanCardToColumn(nextBoard, cardId, doneColumnId)
+      if (moved) {
+        nextBoard = moved
+        movedToDone = true
+      }
+    }
+  }
+
+  return { nextBoard, movedToDone }
 }
 
 export function computeBoardSprintMetrics(board: TeamKanbanBoard): BoardSprintMetrics {

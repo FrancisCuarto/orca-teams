@@ -7,6 +7,8 @@ import {
   ChevronDown,
   ChevronUp,
   GitBranch,
+  GitMerge,
+  GitPullRequest,
   MessageSquare
 } from 'lucide-react'
 import type { FactoryRunRecord } from '../../../../../shared/teamwork/team-factory-types'
@@ -199,6 +201,35 @@ export function TeamKanbanCardItem({
           <GitBranch className="size-3 shrink-0" />
           <span className="truncate">{card.branchOrWorktree}</span>
         </div>
+      ) : null}
+
+      {/* Pull / Merge Request Badge */}
+      {card.reviewRequest ? (
+        <a
+          href={card.reviewRequest.url}
+          target="_blank"
+          rel="noreferrer"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          title={`${card.reviewRequest.provider === 'gitlab' ? 'GitLab MR' : 'GitHub PR'} #${card.reviewRequest.number} (${card.reviewRequest.state})`}
+          className={`inline-flex items-center gap-1.5 self-start rounded-md border px-1.5 py-0.5 text-3xs font-medium transition-colors hover:underline ${
+            card.reviewRequest.state === 'merged'
+              ? 'bg-secondary/60 border-workspace-status-review/40 text-workspace-status-review'
+              : card.reviewRequest.state === 'closed'
+                ? 'bg-destructive/10 border-destructive/30 text-destructive'
+                : 'bg-primary/10 border-primary/30 text-primary'
+          }`}
+        >
+          {card.reviewRequest.state === 'merged' ? (
+            <GitMerge className="size-3 shrink-0" />
+          ) : (
+            <GitPullRequest className="size-3 shrink-0" />
+          )}
+          <span>
+            {card.reviewRequest.provider === 'gitlab' ? 'MR' : 'PR'} #{card.reviewRequest.number}
+          </span>
+          <span className="uppercase opacity-80">{card.reviewRequest.state}</span>
+        </a>
       ) : null}
 
       {/* Agent Details: Model & Skills */}

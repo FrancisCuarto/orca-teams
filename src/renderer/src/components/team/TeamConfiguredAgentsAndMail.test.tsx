@@ -47,6 +47,8 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     }),
     cancelExecution: vi.fn(async () => null),
     approveExecution: vi.fn(async () => null),
+    createReviewRequest: vi.fn(async () => null),
+    refreshReviewRequest: vi.fn(async () => null),
     rejectExecution: vi.fn(async () => null),
     getExecutionDiff: vi.fn(async (executionId: string) => ({
       executionId,

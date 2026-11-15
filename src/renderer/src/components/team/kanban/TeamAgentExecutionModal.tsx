@@ -5,9 +5,11 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  ExternalLink,
   FileDiff,
   GitBranch,
   GitMerge,
+  GitPullRequest,
   Loader2,
   MessageSquarePlus,
   RefreshCw,
@@ -46,12 +48,33 @@ type Props = {
   onCancel?: (executionId: string) => void
   onRerun?: () => void
   onApprove?: (executionId: string, mergeToBase: boolean) => void
+  onApproveAndCreateReview?: (executionId: string) => Promise<void> | void
+  onCreateReviewRequest?: (executionId: string) => Promise<void> | void
+  onRefreshReviewRequest?: (executionId: string) => Promise<void> | void
   onReject?: (executionId: string, discardWorktree: boolean) => void
   onLoadDiff?: (executionId: string) => Promise<TeamExecutionDiffResult | null>
   onRequestChanges?: (executionId: string, feedback: string) => Promise<void> | void
 }
 
 type ModalTab = 'logs' | 'diff'
+
+const REVIEW_STATE_STYLES: Record<
+  'open' | 'merged' | 'closed',
+  { label: string; className: string }
+> = {
+  open: {
+    label: 'Abierto',
+    className: 'bg-primary/10 text-primary border-primary/30'
+  },
+  merged: {
+    label: 'Fusionado',
+    className: 'bg-secondary/60 text-workspace-status-review border-workspace-status-review/40'
+  },
+  closed: {
+    label: 'Cerrado',
+    className: 'bg-destructive/10 text-destructive border-destructive/30'
+  }
+}
 
 function formatDiffStatusCode(status: TeamExecutionDiffFileStatus): string {
   switch (status) {
@@ -92,6 +115,9 @@ type BodyProps = {
   onCancel?: (executionId: string) => void
   onRerun?: () => void
   onApprove?: (executionId: string, mergeToBase: boolean) => void
+  onApproveAndCreateReview?: (executionId: string) => Promise<void> | void
+  onCreateReviewRequest?: (executionId: string) => Promise<void> | void
+  onRefreshReviewRequest?: (executionId: string) => Promise<void> | void
   onReject?: (executionId: string, discardWorktree: boolean) => void
   onLoadDiff?: (executionId: string) => Promise<TeamExecutionDiffResult | null>
   onRequestChanges?: (executionId: string, feedback: string) => Promise<void> | void
@@ -107,6 +133,9 @@ function TeamAgentExecutionModalBody({
   onCancel,
   onRerun,
   onApprove,
+  onApproveAndCreateReview,
+  onCreateReviewRequest,
+  onRefreshReviewRequest,
   onReject,
   onLoadDiff,
   onRequestChanges
@@ -119,6 +148,8 @@ function TeamAgentExecutionModalBody({
   const [diffError, setDiffError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState('')
   const [submittingChanges, setSubmittingChanges] = useState(false)
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [isRefreshingReview, setIsRefreshingReview] = useState(false)
 
   useEffect(() => {
     if (
@@ -220,6 +251,45 @@ function TeamAgentExecutionModalBody({
 
   const diffFilesCount = diffResult?.files.length ?? execution.changedFiles?.length ?? 0
 
+  const handleApproveAndCreateReview = async (): Promise<void> => {
+    if (!onApproveAndCreateReview || isSubmittingReview) {
+      return
+    }
+    setIsSubmittingReview(true)
+    try {
+      await onApproveAndCreateReview(execution.id)
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
+
+  const handleCreateReview = async (): Promise<void> => {
+    if (!onCreateReviewRequest || isSubmittingReview) {
+      return
+    }
+    setIsSubmittingReview(true)
+    try {
+      await onCreateReviewRequest(execution.id)
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
+
+  const handleRefreshReview = async (): Promise<void> => {
+    if (!onRefreshReviewRequest || isRefreshingReview) {
+      return
+    }
+    setIsRefreshingReview(true)
+    try {
+      await onRefreshReviewRequest(execution.id)
+    } finally {
+      setIsRefreshingReview(false)
+    }
+  }
+
+  const reviewRequest = execution.reviewRequest
+  const reviewStateStyle = reviewRequest ? REVIEW_STATE_STYLES[reviewRequest.state] : null
+
   return (
     <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto scrollbar-sleek">
       <DialogHeader>
@@ -290,7 +360,74 @@ function TeamAgentExecutionModalBody({
           </div>
         )}
 
-        {needsApproval && (onApprove || onReject) && (
+        {reviewRequest && reviewStateStyle && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card/60 p-2.5 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <GitPullRequest className="w-4 h-4 text-primary shrink-0" />
+              <span className="font-semibold text-foreground">
+                {reviewRequest.provider === 'gitlab' ? 'GitLab MR' : 'GitHub PR'} #
+                {reviewRequest.number}
+              </span>
+              <Badge variant="outline" className={reviewStateStyle.className}>
+                {reviewStateStyle.label}
+              </Badge>
+              <a
+                href={reviewRequest.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-2xs text-primary hover:underline truncate max-w-[240px]"
+                title={reviewRequest.url}
+              >
+                <span className="truncate">{reviewRequest.url}</span>
+                <ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+            </div>
+            {onRefreshReviewRequest && (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                disabled={isRefreshingReview}
+                onClick={() => void handleRefreshReview()}
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshingReview ? 'animate-spin' : ''}`} />
+                Actualizar estado
+              </Button>
+            )}
+          </div>
+        )}
+
+        {!reviewRequest &&
+          !needsApproval &&
+          execution.status === 'completed' &&
+          (execution.worktreePath || execution.branchOrWorktree) &&
+          onCreateReviewRequest && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2.5 text-xs">
+              <span className="text-muted-foreground text-2xs">
+                ¿Listo para revisión en {execution.branchOrWorktree ?? 'la rama remota'}?
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="secondary"
+                disabled={!canApproveExecutions || isSubmittingReview}
+                onClick={() => {
+                  if (canApproveExecutions) {
+                    void handleCreateReview()
+                  }
+                }}
+              >
+                {isSubmittingReview ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <GitPullRequest className="w-3.5 h-3.5" />
+                )}
+                Abrir PR/MR
+              </Button>
+            </div>
+          )}
+
+        {needsApproval && (onApprove || onApproveAndCreateReview || onReject) && (
           <div className="rounded-lg border border-annotation-highlight/30 bg-annotation-highlight/10 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground">
               <span className="flex items-center gap-2">
@@ -308,7 +445,7 @@ function TeamAgentExecutionModalBody({
                 <Button
                   type="button"
                   size="xs"
-                  disabled={!canApproveExecutions}
+                  disabled={!canApproveExecutions || isSubmittingReview}
                   onClick={() => {
                     if (canApproveExecutions) {
                       onApprove(execution.id, true)
@@ -319,12 +456,33 @@ function TeamAgentExecutionModalBody({
                   Aprobar y Fusionar a {execution.baseBranch ?? 'rama base'}
                 </Button>
               )}
+              {onApproveAndCreateReview &&
+                (execution.worktreePath || execution.branchOrWorktree) && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="secondary"
+                    disabled={!canApproveExecutions || isSubmittingReview}
+                    onClick={() => {
+                      if (canApproveExecutions) {
+                        void handleApproveAndCreateReview()
+                      }
+                    }}
+                  >
+                    {isSubmittingReview ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <GitPullRequest className="w-3.5 h-3.5" />
+                    )}
+                    Aprobar y abrir PR/MR
+                  </Button>
+                )}
               {onApprove && (
                 <Button
                   type="button"
                   size="xs"
                   variant="secondary"
-                  disabled={!canApproveExecutions}
+                  disabled={!canApproveExecutions || isSubmittingReview}
                   onClick={() => {
                     if (canApproveExecutions) {
                       onApprove(execution.id, false)
@@ -340,7 +498,7 @@ function TeamAgentExecutionModalBody({
                   type="button"
                   size="xs"
                   variant="destructive"
-                  disabled={!canApproveExecutions}
+                  disabled={!canApproveExecutions || isSubmittingReview}
                   onClick={() => {
                     if (canApproveExecutions) {
                       onReject(execution.id, Boolean(execution.worktreePath))
@@ -633,6 +791,9 @@ export function TeamAgentExecutionModal({
   onCancel,
   onRerun,
   onApprove,
+  onApproveAndCreateReview,
+  onCreateReviewRequest,
+  onRefreshReviewRequest,
   onReject,
   onLoadDiff,
   onRequestChanges
@@ -654,6 +815,9 @@ export function TeamAgentExecutionModal({
         onCancel={onCancel}
         onRerun={onRerun}
         onApprove={onApprove}
+        onApproveAndCreateReview={onApproveAndCreateReview}
+        onCreateReviewRequest={onCreateReviewRequest}
+        onRefreshReviewRequest={onRefreshReviewRequest}
         onReject={onReject}
         onLoadDiff={onLoadDiff}
         onRequestChanges={onRequestChanges}

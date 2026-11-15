@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
   TeamExecutionDiffResult,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamRequestExecutionChangesRequest,
   TeamStartExecutionRequest
@@ -25,6 +27,12 @@ export type UseTeamAgentExecutionsResult = {
   startCardExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord | null>
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   approveExecution: (options: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
+  createReviewRequest: (
+    options: TeamCreateReviewRequestRequest
+  ) => Promise<AgentExecutionRecord | null>
+  refreshReviewRequest: (
+    options: TeamRefreshReviewRequestRequest
+  ) => Promise<AgentExecutionRecord | null>
   rejectExecution: (options: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
   getExecutionDiff: (executionId: string) => Promise<TeamExecutionDiffResult | null>
   requestExecutionChanges: (
@@ -135,6 +143,36 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     [recordExecution]
   )
 
+  const createReviewRequest = useCallback(
+    async (options: TeamCreateReviewRequestRequest): Promise<AgentExecutionRecord | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.createReviewRequest) {
+        return null
+      }
+      const updated = await teamApi.createReviewRequest(options)
+      if (updated) {
+        recordExecution(updated)
+      }
+      return updated
+    },
+    [recordExecution]
+  )
+
+  const refreshReviewRequest = useCallback(
+    async (options: TeamRefreshReviewRequestRequest): Promise<AgentExecutionRecord | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.refreshReviewRequest) {
+        return null
+      }
+      const updated = await teamApi.refreshReviewRequest(options)
+      if (updated) {
+        recordExecution(updated)
+      }
+      return updated
+    },
+    [recordExecution]
+  )
+
   const rejectExecution = useCallback(
     async (options: TeamRejectExecutionRequest): Promise<AgentExecutionRecord | null> => {
       const teamApi = getTeamApi()
@@ -211,6 +249,8 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     startCardExecution,
     cancelExecution,
     approveExecution,
+    createReviewRequest,
+    refreshReviewRequest,
     rejectExecution,
     getExecutionDiff,
     requestExecutionChanges,
