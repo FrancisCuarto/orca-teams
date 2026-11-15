@@ -9,6 +9,7 @@ import type {
   TeamDeepLinkJoinPayload,
   TeamExecutionEvent,
   TeamFactoryEvent,
+  TeamFetchExternalIssuesRequest,
   TeamMailConfigInput,
   TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
@@ -118,5 +119,7 @@ export const teamApi: TeamApi = {
   listCardComments: (cardId: string) => ipcRenderer.invoke('team:listCardComments', cardId),
   addCardComment: (request: TeamAddCardCommentRequest) =>
     ipcRenderer.invoke('team:addCardComment', request),
-  deleteCardComment: (commentId: string) => ipcRenderer.invoke('team:deleteCardComment', commentId)
+  deleteCardComment: (commentId: string) => ipcRenderer.invoke('team:deleteCardComment', commentId),
+  fetchExternalIssues: (request: TeamFetchExternalIssuesRequest) =>
+    ipcRenderer.invoke('team:fetchExternalIssues', request)
 } satisfies NonNullable<PreloadApi['team']>

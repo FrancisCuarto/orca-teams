@@ -8,6 +8,7 @@ import type {
   TeamCreateReviewRequestRequest,
   TeamExecutionEvent,
   TeamFactoryEvent,
+  TeamFetchExternalIssuesRequest,
   TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
   TeamRequestExecutionChangesRequest,
@@ -36,6 +37,7 @@ import { TeamEmailService } from '../teamwork/team-email-service'
 import { TeamFactoryRunner } from '../teamwork/team-factory-runner'
 import { TeamHostDatabase } from '../teamwork/team-host-database'
 import { slugify } from '../teamwork/team-host-database-queries'
+import { fetchGitHubIssues, fetchLinearIssues } from '../teamwork/team-issue-importer'
 import { TeamRelayHttpClient } from '../teamwork/team-relay-http-client'
 import { TeamSyncRelayServer } from '../teamwork/team-sync-relay-server'
 import { registerTeamAuthSyncAndMailHandlers } from './team-workspace-ipc'
@@ -666,6 +668,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
 
   ipcMain.handle('team:deleteCardComment', (_event, commentId: string) =>
     db.deleteCardComment(commentId)
+  )
+
+  ipcMain.handle(
+    'team:fetchExternalIssues',
+    async (_event, request: TeamFetchExternalIssuesRequest) => {
+      switch (request.provider) {
+        case 'github':
+          return fetchGitHubIssues({ repoPath: request.repoPath, limit: request.limit })
+        case 'linear':
+          return fetchLinearIssues({
+            apiKey: request.apiKey,
+            teamKey: request.teamKey,
+            limit: request.limit
+          })
+      }
+    }
   )
 
   registerTeamAuthSyncAndMailHandlers({

@@ -178,6 +178,57 @@ describe('TeamBoardCRDT', () => {
     clientA.destroy()
     clientB.destroy()
   })
+
+  it('preserva y sincroniza externalIssueRef entre instancias CRDT', () => {
+    const seed = createSampleBoard()
+    const clientA = new TeamBoardCRDT('board-alpha')
+    clientA.initializeFromBoard(seed)
+
+    const importedCard: TeamKanbanCard = {
+      id: 'card-gh-42',
+      title: 'Corregir autenticación SSO',
+      description: 'Importado desde GitHub',
+      columnId: 'col-todo',
+      priority: 'high',
+      labels: ['auth', 'bug'],
+      checklist: [],
+      externalIssueRef: {
+        provider: 'github',
+        id: '42',
+        key: '#42',
+        url: 'https://github.com/orca/teams/issues/42'
+      },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+
+    clientA.upsertCard(importedCard)
+    clientA.moveCard('card-gh-42', 'col-in-progress')
+
+    const clientB = new TeamBoardCRDT('board-alpha')
+    clientB.applyUpdate(clientA.encodeStateAsUpdate())
+
+    const syncedCard = clientB.getBoard().cards['card-gh-42']
+    expect(syncedCard?.externalIssueRef).toEqual({
+      provider: 'github',
+      id: '42',
+      key: '#42',
+      url: 'https://github.com/orca/teams/issues/42'
+    })
+
+    // Actualizar título manteniendo externalIssueRef
+    clientB.upsertCard({
+      ...importedCard,
+      externalIssueRef: undefined,
+      title: 'Corregir SSO en login'
+    })
+    expect(clientB.getBoard().cards['card-gh-42']?.externalIssueRef).toEqual({
+      provider: 'github',
+      id: '42',
+      key: '#42',
+      url: 'https://github.com/orca/teams/issues/42'
+    })
+  })
 })
 
 describe('TeamRoomProvider', () => {

@@ -77,12 +77,16 @@ export function buildKanbanCardFromDraft(input: CardFormDraftInput): TeamKanbanC
     ...(existingCard?.comments ? { comments: existingCard.comments } : {}),
     ...(linkedNoteIds.length > 0 ? { linkedNoteIds } : {}),
     ...(sourceWhiteboardElementId ? { sourceWhiteboardElementId } : {}),
+    ...(existingCard?.externalIssueRef
+      ? { externalIssueRef: { ...existingCard.externalIssueRef } }
+      : {}),
     estimatePoints: input.estimatePoints,
     branchOrWorktree: input.branchOrWorktree.trim() || undefined,
     isolateWorktree: input.isolateWorktree,
     requiresApproval: input.requiresApproval,
     reviewRequest: existingCard?.reviewRequest,
     blockedReason: input.blockedReason.trim() || undefined,
+    ...(existingCard?.dueDate ? { dueDate: existingCard.dueDate } : {}),
     createdAt: existingCard?.createdAt ?? Date.now(),
     updatedAt: Date.now()
   }

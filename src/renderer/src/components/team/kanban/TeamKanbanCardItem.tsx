@@ -156,6 +156,13 @@ export function TeamKanbanCardItem({
               {linkedNotesCount}
             </Badge>
           ) : null}
+
+          {card.externalIssueRef ? (
+            <Badge variant="referenceLabel">
+              {card.externalIssueRef.provider === 'github' ? 'GitHub' : 'Linear'}{' '}
+              {card.externalIssueRef.key}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">

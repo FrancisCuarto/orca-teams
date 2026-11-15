@@ -354,6 +354,7 @@ export default function TeamPage(): React.JSX.Element {
         ) : activeTab === 'kanban' && board ? (
           <TeamKanbanConnectedView
             key={activeProjectId}
+            teamId={registry.activeTeam?.id ?? 'team-local'}
             projectId={activeProjectId}
             projectPath={projectPath}
             initialBoard={board}

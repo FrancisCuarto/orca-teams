@@ -48,6 +48,27 @@ export type TeamCardComment = {
   updatedAt?: number
 }
 
+export type ExternalIssueProvider = 'github' | 'linear'
+
+export type ExternalIssueRef = {
+  provider: ExternalIssueProvider
+  id: string
+  key: string
+  url: string
+}
+
+export type ExternalTeamIssue = {
+  provider: ExternalIssueProvider
+  id: string
+  key: string
+  title: string
+  description: string
+  url: string
+  labels: string[]
+  priority: TeamKanbanPriority
+  state: string
+}
+
 export type TeamKanbanCard = {
   id: string
   title: string
@@ -60,6 +81,7 @@ export type TeamKanbanCard = {
   comments?: TeamCardComment[]
   linkedNoteIds?: string[]
   sourceWhiteboardElementId?: string
+  externalIssueRef?: ExternalIssueRef
   branchOrWorktree?: string
   isolateWorktree?: boolean
   requiresApproval?: boolean
@@ -334,3 +356,22 @@ export function isTeamCardComment(value: unknown): value is TeamCardComment {
   )
 }
 
+export function isExternalIssueProvider(value: unknown): value is ExternalIssueProvider {
+  return value === 'github' || value === 'linear'
+}
+
+export function isExternalIssueRef(value: unknown): value is ExternalIssueRef {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  return (
+    'provider' in value &&
+    isExternalIssueProvider(value.provider) &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'key' in value &&
+    typeof value.key === 'string' &&
+    'url' in value &&
+    typeof value.url === 'string'
+  )
+}

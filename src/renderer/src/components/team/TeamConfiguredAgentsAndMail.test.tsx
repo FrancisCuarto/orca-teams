@@ -107,6 +107,7 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
       createdAt: req.createdAt ?? Date.now()
     })),
     deleteCardComment: vi.fn(async () => true),
+    fetchExternalIssues: vi.fn(async () => []),
     ...overrides
   }
   Object.defineProperty(window, 'api', {

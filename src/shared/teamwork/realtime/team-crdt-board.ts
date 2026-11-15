@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import {
+  isExternalIssueRef,
   isTeamCardComment,
   isTeamKanbanPriority,
   type TeamCardComment,
@@ -68,25 +69,28 @@ function readChecklist(value: unknown): TeamKanbanChecklistItem[] {
   }
   const items: TeamKanbanChecklistItem[] = []
   for (const entry of value) {
-    if (
-      isRecord(entry) &&
-      typeof entry.id === 'string' &&
-      typeof entry.text === 'string' &&
-      typeof entry.done === 'boolean'
-    ) {
-      items.push({ id: entry.id, text: entry.text, done: entry.done })
+    if (isRecord(entry) && typeof entry.id === 'string' && typeof entry.text === 'string') {
+      items.push({ id: entry.id, text: entry.text, done: Boolean(entry.done) })
     }
   }
   return items
 }
 
-export function normalizeKanbanCardForCRDT(card: TeamKanbanCard): TeamKanbanCard {
+export function normalizeKanbanCardForCRDT(
+  card: TeamKanbanCard,
+  existing?: TeamKanbanCard
+): TeamKanbanCard {
   const cleanCard = stripCardComments(card)
   const linkedNoteIds = readStringArray(cleanCard.linkedNoteIds)
   const sourceWhiteboardElementId =
-    typeof cleanCard.sourceWhiteboardElementId === 'string' &&
+    (typeof cleanCard.sourceWhiteboardElementId === 'string' &&
     cleanCard.sourceWhiteboardElementId.trim()
       ? cleanCard.sourceWhiteboardElementId.trim()
+      : undefined) ?? existing?.sourceWhiteboardElementId
+  const externalIssueRef = cleanCard.externalIssueRef
+    ? { ...cleanCard.externalIssueRef }
+    : existing?.externalIssueRef
+      ? { ...existing.externalIssueRef }
       : undefined
   const normalized: TeamKanbanCard = {
     id: cleanCard.id,
@@ -110,6 +114,9 @@ export function normalizeKanbanCardForCRDT(card: TeamKanbanCard): TeamKanbanCard
   }
   if (sourceWhiteboardElementId) {
     normalized.sourceWhiteboardElementId = sourceWhiteboardElementId
+  }
+  if (externalIssueRef) {
+    normalized.externalIssueRef = externalIssueRef
   }
   if (cleanCard.branchOrWorktree !== undefined) {
     normalized.branchOrWorktree = cleanCard.branchOrWorktree
@@ -152,10 +159,15 @@ export function readKanbanCardFromMap(raw: unknown): TeamKanbanCard | null {
     typeof raw.sourceWhiteboardElementId === 'string' && raw.sourceWhiteboardElementId.trim()
       ? raw.sourceWhiteboardElementId.trim()
       : undefined
+  const externalIssueRef = isExternalIssueRef(raw.externalIssueRef)
+    ? { ...raw.externalIssueRef }
+    : undefined
   const reviewRequest = isRecord(raw.reviewRequest)
     ? // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: validated record structure from CRDT map
       (raw.reviewRequest as TeamKanbanCard['reviewRequest'])
     : undefined
+  const createdAt = typeof raw.createdAt === 'number' ? raw.createdAt : Date.now()
+  const updatedAt = typeof raw.updatedAt === 'number' ? raw.updatedAt : createdAt
 
   return {
     id: raw.id,
@@ -168,6 +180,7 @@ export function readKanbanCardFromMap(raw: unknown): TeamKanbanCard | null {
     checklist: readChecklist(raw.checklist),
     ...(linkedNoteIds.length > 0 ? { linkedNoteIds } : {}),
     ...(sourceWhiteboardElementId ? { sourceWhiteboardElementId } : {}),
+    ...(externalIssueRef ? { externalIssueRef } : {}),
     ...(typeof raw.branchOrWorktree === 'string'
       ? { branchOrWorktree: raw.branchOrWorktree }
       : {}),
@@ -179,8 +192,8 @@ export function readKanbanCardFromMap(raw: unknown): TeamKanbanCard | null {
     ...(typeof raw.estimatePoints === 'number' ? { estimatePoints: raw.estimatePoints } : {}),
     ...(typeof raw.blockedReason === 'string' ? { blockedReason: raw.blockedReason } : {}),
     ...(typeof raw.dueDate === 'string' ? { dueDate: raw.dueDate } : {}),
-    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
-    updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now()
+    createdAt,
+    updatedAt
   }
 }
 
@@ -304,14 +317,16 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
 
   upsertCard(card: TeamKanbanCard): void {
     this.doc.transact(() => {
-      const existing = readKanbanCardFromMap(this.cardsMap.get(card.id))
-      const nextCard = normalizeKanbanCardForCRDT({
-        ...card,
-        ...(existing?.sourceWhiteboardElementId && !card.sourceWhiteboardElementId
-          ? { sourceWhiteboardElementId: existing.sourceWhiteboardElementId }
-          : {}),
-        updatedAt: Date.now()
-      })
+      const existingRaw = this.cardsMap.get(card.id)
+      const existing = existingRaw ? (readKanbanCardFromMap(existingRaw) ?? undefined) : undefined
+      const now = Date.now()
+      const nextCard = normalizeKanbanCardForCRDT(
+        {
+          ...card,
+          updatedAt: now
+        },
+        existing
+      )
       this.cardsMap.set(card.id, nextCard)
       if (card.comments) {
         for (const comment of card.comments) {
@@ -320,7 +335,7 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
           }
         }
       }
-      this.metadataMap.set('updatedAt', Date.now())
+      this.metadataMap.set('updatedAt', now)
 
       const isNew = !existing
       const targetColId = nextCard.columnId
@@ -361,18 +376,20 @@ export class TeamBoardCRDT implements ITeamBoardCRDT {
 
   moveCard(cardId: string, targetColumnId: string, newIndex?: number): void {
     this.doc.transact(() => {
-      const card = readKanbanCardFromMap(this.cardsMap.get(cardId))
+      const rawCard = this.cardsMap.get(cardId)
+      const card = rawCard ? readKanbanCardFromMap(rawCard) : null
       if (!card) {
         return
       }
 
+      const now = Date.now()
       const updatedCard = normalizeKanbanCardForCRDT({
         ...card,
         columnId: targetColumnId,
-        updatedAt: Date.now()
+        updatedAt: now
       })
       this.cardsMap.set(cardId, updatedCard)
-      this.metadataMap.set('updatedAt', Date.now())
+      this.metadataMap.set('updatedAt', now)
 
       const columns = this.columnsArray.toArray()
       const updated = columns.map((col) => {

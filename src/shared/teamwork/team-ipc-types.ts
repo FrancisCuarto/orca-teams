@@ -10,7 +10,12 @@ import type {
   TeamSyncSettings,
   TeamUserProfile
 } from './team-workspace-types'
-import type { TeamCardComment, TeamCommentMention, TeamKanbanCard } from './team-kanban-types'
+import type {
+  ExternalTeamIssue,
+  TeamCardComment,
+  TeamCommentMention,
+  TeamKanbanCard
+} from './team-kanban-types'
 import type { FactoryConfig, FactoryRunRecord } from './team-factory-types'
 
 export type ConfiguredTeamAgent = {
@@ -214,6 +219,19 @@ export type TeamExecutionDiffResult = {
   error?: string
 }
 
+export type TeamFetchExternalIssuesRequest =
+  | {
+      provider: 'github'
+      repoPath: string
+      limit?: number
+    }
+  | {
+      provider: 'linear'
+      apiKey: string
+      teamKey?: string
+      limit?: number
+    }
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
@@ -298,4 +316,5 @@ export type TeamApi = {
   listCardComments: (cardId: string) => Promise<TeamCardComment[]>
   addCardComment: (request: TeamAddCardCommentRequest) => Promise<TeamCardComment>
   deleteCardComment: (commentId: string) => Promise<boolean>
+  fetchExternalIssues: (request: TeamFetchExternalIssuesRequest) => Promise<ExternalTeamIssue[]>
 }

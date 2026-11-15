@@ -3,6 +3,7 @@ import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from
 import { toast } from 'sonner'
 import type {
   ExtendedTeamMember,
+  ExternalTeamIssue,
   TeamCardComment,
   TeamKanbanBoard,
   TeamKanbanCard,
@@ -20,13 +21,16 @@ import type { CollaboratorPresence } from '../../../../../shared/teamwork/realti
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
 import { useTeamFactory } from '../hooks/use-team-factory'
+import { getTeamPreloadApi } from '../hooks/use-team-workspace-registry-actions'
 import {
   applyReviewRequestToKanbanCard,
   computeBoardSprintMetrics,
+  importExternalIssuesToBoard,
   moveKanbanCardToColumn
 } from './team-kanban-board-mutations'
 import { shouldMoveToInProgress } from './team-kanban-execution-helpers'
 import { TeamAgentExecutionModal } from './TeamAgentExecutionModal'
+import { TeamIssueImporterModal } from './TeamIssueImporterModal'
 import { TeamKanbanCardModal } from './TeamKanbanCardModal'
 import { TeamKanbanColumnsViewport } from './TeamKanbanColumnsViewport'
 import { TeamKanbanDragOverlay } from './TeamKanbanDragOverlay'
@@ -39,6 +43,7 @@ import { useKanbanDragHandlers } from './use-kanban-drag-handlers'
 
 type Props = {
   board: TeamKanbanBoard
+  teamId?: string
   projectId?: string
   projectPath?: string | null
   currentUserId?: string
@@ -58,6 +63,7 @@ type Props = {
 
 export function TeamKanbanBoardView({
   board,
+  teamId = 'team-local',
   projectId,
   projectPath,
   currentUserId = 'usr-francis',
@@ -80,6 +86,7 @@ export function TeamKanbanBoardView({
 
   const [editingCard, setEditingCard] = useState<TeamKanbanCard | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined)
   const [executionModalCardId, setExecutionModalCardId] = useState<string | null>(null)
   const [factoryModalCardId, setFactoryModalCardId] = useState<string | null>(null)
@@ -421,6 +428,52 @@ export function TeamKanbanBoardView({
     [refreshReviewRequest, projectPath, currentUserId, currentUserName, syncReviewResultToBoard]
   )
 
+  const handleImportExternalIssues = useCallback(
+    (selectedIssues: ExternalTeamIssue[], destinationColumnId: string): void => {
+      if (!canEditBoard) {
+        return
+      }
+      const { nextBoard, createdCards } = importExternalIssuesToBoard(
+        board,
+        selectedIssues,
+        destinationColumnId
+      )
+      if (createdCards.length === 0) {
+        toast.info('Todos los issues seleccionados ya existen en el tablero')
+        return
+      }
+      onChange(nextBoard)
+      const provider = selectedIssues[0]?.provider === 'linear' ? 'Linear' : 'GitHub'
+      toast.success(
+        `${createdCards.length} ${createdCards.length === 1 ? 'issue importado' : 'issues importados'} desde ${provider}`
+      )
+
+      const teamApi = getTeamPreloadApi()
+      if (teamApi?.recordActivity) {
+        void teamApi
+          .recordActivity({
+            teamId,
+            projectId: resolvedProjectId,
+            actorId: currentUserId,
+            actorName: currentUserName ?? currentUserId,
+            actorType: 'human',
+            action: 'issues.imported',
+            targetType: 'card',
+            summary: `Importó ${createdCards.length} ${createdCards.length === 1 ? 'issue' : 'issues'} desde ${provider}`,
+            metadata: {
+              provider: selectedIssues[0]?.provider,
+              count: createdCards.length,
+              keys: createdCards
+                .map((card) => card.externalIssueRef?.key)
+                .filter((key): key is string => typeof key === 'string')
+            }
+          })
+          .catch(() => undefined)
+      }
+    },
+    [board, canEditBoard, currentUserId, currentUserName, onChange, resolvedProjectId, teamId]
+  )
+
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-background">
       <TeamKanbanToolbar
@@ -439,6 +492,7 @@ export function TeamKanbanBoardView({
         onClearFilters={filters.handleClearFilters}
         onOpenFactoryConfig={() => setIsFactoryConfigOpen(true)}
         onCreateTask={() => handleOpenNewCard()}
+        onOpenImportIssues={canEditBoard ? () => setIsImportModalOpen(true) : undefined}
       />
       <TeamKanbanSprintHeader
         sprintGoal={board.sprintGoal}
@@ -523,6 +577,15 @@ export function TeamKanbanBoardView({
         onDispatchAgentFollowUp={(targetCard, mention, comment) =>
           void actions.handleDispatchAgentFollowUp(targetCard, mention, comment)
         }
+      />
+      <TeamIssueImporterModal
+        isOpen={isImportModalOpen}
+        columns={board.columns}
+        defaultColumnId={board.columns[0]?.id}
+        existingCards={board.cards}
+        projectPath={projectPath}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportExternalIssues}
       />
       <TeamAgentExecutionModal
         open={Boolean(executionModalCardId && activeExecution)}

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Factory, Plus } from 'lucide-react'
+import { Download, Factory, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TeamKanbanFilterBar } from './TeamKanbanFilterBar'
@@ -25,6 +25,7 @@ type Props = {
   onClearFilters: () => void
   onOpenFactoryConfig?: () => void
   onCreateTask: () => void
+  onOpenImportIssues?: () => void
 }
 
 export function TeamKanbanToolbar({
@@ -42,7 +43,8 @@ export function TeamKanbanToolbar({
   onStatusFilterChange,
   onClearFilters,
   onOpenFactoryConfig,
-  onCreateTask
+  onCreateTask,
+  onOpenImportIssues
 }: Props): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-border bg-secondary/10">
@@ -81,6 +83,27 @@ export function TeamKanbanToolbar({
                 {waitingHumanCount} gate
               </Badge>
             ) : null}
+          </Button>
+        ) : null}
+        {onOpenImportIssues ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!canCreateTask}
+            title={
+              canCreateTask
+                ? 'Importar issues externos (GitHub / Linear)'
+                : 'Solo lectura: no puedes importar tareas'
+            }
+            onClick={() => {
+              if (canCreateTask) {
+                onOpenImportIssues()
+              }
+            }}
+          >
+            <Download className="size-3.5" />
+            Importar Issues
           </Button>
         ) : null}
         <Button
