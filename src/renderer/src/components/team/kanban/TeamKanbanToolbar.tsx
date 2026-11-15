@@ -1,123 +1,58 @@
 import React from 'react'
-import { AlertTriangle, Plus, Search, Sparkles, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { TeamKanbanFilterBar } from './TeamKanbanFilterBar'
+import type {
+  TeamKanbanAssigneeOption,
+  TeamKanbanFilterState,
+  TeamKanbanStatusFilter
+} from './team-kanban-filters'
 
 type Props = {
-  searchQuery: string
-  selectedPriority: string
-  selectedFilterMember: string | null
-  statusFilter: 'all' | 'blocked' | 'agents'
+  filters: TeamKanbanFilterState
+  statusFilter: TeamKanbanStatusFilter
+  myPendingCount: number
+  availableLabels: readonly string[]
+  assigneeOptions: readonly TeamKanbanAssigneeOption[]
   filteredCount: number
   filteredPoints: number
-  onSearchChange: (value: string) => void
-  onPriorityChange: (value: string) => void
-  onStatusFilterChange: (value: 'all' | 'blocked' | 'agents') => void
+  onFiltersChange: (next: TeamKanbanFilterState) => void
+  onStatusFilterChange: (value: TeamKanbanStatusFilter) => void
   onClearFilters: () => void
   onCreateTask: () => void
 }
 
 export function TeamKanbanToolbar({
-  searchQuery,
-  selectedPriority,
-  selectedFilterMember,
+  filters,
   statusFilter,
+  myPendingCount,
+  availableLabels,
+  assigneeOptions,
   filteredCount,
   filteredPoints,
-  onSearchChange,
-  onPriorityChange,
+  onFiltersChange,
   onStatusFilterChange,
   onClearFilters,
   onCreateTask
 }: Props): React.JSX.Element {
-  const hasActiveFilters =
-    searchQuery !== '' ||
-    selectedPriority !== 'all' ||
-    selectedFilterMember !== null ||
-    statusFilter !== 'all'
-
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-border bg-secondary/10">
-      <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-        {/* Search */}
-        <div className="relative w-56 min-w-[160px]">
-          <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar tareas, etiquetas..."
-            className="h-8 pl-8 pr-3 text-xs"
-          />
-        </div>
+      <TeamKanbanFilterBar
+        filters={filters}
+        statusFilter={statusFilter}
+        myPendingCount={myPendingCount}
+        availableLabels={availableLabels}
+        assigneeOptions={assigneeOptions}
+        onFiltersChange={onFiltersChange}
+        onStatusFilterChange={onStatusFilterChange}
+        onClearFilters={onClearFilters}
+      />
 
-        {/* Priority Filter */}
-        <select
-          value={selectedPriority}
-          onChange={(e) => onPriorityChange(e.target.value)}
-          className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="all">Todas las prioridades</option>
-          <option value="urgent">Urgente</option>
-          <option value="high">Alta</option>
-          <option value="medium">Media</option>
-          <option value="low">Baja</option>
-        </select>
-
-        {/* Quick Status Pills */}
-        <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border">
-          <Button
-            type="button"
-            size="xs"
-            variant={statusFilter === 'all' ? 'secondary' : 'ghost'}
-            onClick={() => onStatusFilterChange('all')}
-            className="text-xs h-6 px-2"
-          >
-            Todas
-          </Button>
-          <Button
-            type="button"
-            size="xs"
-            variant={statusFilter === 'agents' ? 'secondary' : 'ghost'}
-            onClick={() => onStatusFilterChange('agents')}
-            className="text-xs h-6 px-2 gap-1"
-          >
-            <Sparkles className="size-3 text-git-graph-lane-5" />
-            Agentes IA
-          </Button>
-          <Button
-            type="button"
-            size="xs"
-            variant={statusFilter === 'blocked' ? 'secondary' : 'ghost'}
-            onClick={() => onStatusFilterChange('blocked')}
-            className="text-xs h-6 px-2 gap-1"
-          >
-            <AlertTriangle className="size-3 text-destructive" />
-            Bloqueadas
-          </Button>
-        </div>
-
-        {/* Filtered Count & Points Badge */}
+      <div className="flex items-center gap-2 shrink-0">
         <Badge variant="outline" className="text-3xs font-mono h-6 px-2 text-muted-foreground">
           {filteredCount} {filteredCount === 1 ? 'tarea' : 'tareas'} · {filteredPoints} pts
         </Badge>
-
-        {/* Clear Filters */}
-        {hasActiveFilters ? (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onClearFilters}
-            title="Limpiar filtros activos"
-            className="h-6 gap-1 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-3" />
-            Limpiar
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
         <Button size="sm" onClick={onCreateTask}>
           <Plus className="size-3.5" />
           Nueva Tarea

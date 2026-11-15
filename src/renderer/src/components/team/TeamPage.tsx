@@ -1,7 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { Activity, FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
+import type {
+  TeamKanbanCard,
+  TeamNote,
+  TeamTab
+} from '../../../../shared/teamwork/team-kanban-types'
 import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
 import {
   computeBoardSprintMetrics,
@@ -12,6 +16,7 @@ import { TeamKanbanConnectedView } from './kanban/TeamKanbanConnectedView'
 import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
 import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
+import { TeamWorkspaceSearch } from './workspace/TeamWorkspaceSearch'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
@@ -21,6 +26,8 @@ import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
 
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
+  const [focusedCardId, setFocusedCardId] = useState<string | null>(null)
+  const [focusedNoteId, setFocusedNoteId] = useState<string | undefined>(undefined)
   const activeWorktree = useActiveWorktree()
   const activeRepo = useActiveRepo()
   const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
@@ -61,6 +68,34 @@ export default function TeamPage(): React.JSX.Element {
     }),
     [syncAndAuth.user.userId, syncAndAuth.user.displayName, syncAndAuth.user.avatarUrl]
   )
+
+  const handleSelectTeam = useCallback(
+    (teamId: string) => {
+      setFocusedCardId(null)
+      setFocusedNoteId(undefined)
+      registry.setActiveTeamId(teamId)
+    },
+    [registry]
+  )
+
+  const handleSelectProject = useCallback(
+    (projectId: string) => {
+      setFocusedCardId(null)
+      setFocusedNoteId(undefined)
+      registry.setActiveProjectId(projectId)
+    },
+    [registry]
+  )
+
+  const handleJumpToCard = useCallback((card: TeamKanbanCard) => {
+    setFocusedCardId(card.id)
+    setActiveTab('kanban')
+  }, [])
+
+  const handleJumpToNote = useCallback((note: TeamNote) => {
+    setFocusedNoteId(note.id)
+    setActiveTab('notes')
+  }, [])
 
   const handleInviteMember = useCallback(
     async (email: string, role: TeamRole) => {
@@ -114,8 +149,8 @@ export default function TeamPage(): React.JSX.Element {
         userRole={registry.userRole}
         currentUser={syncAndAuth.user}
         syncStatus={syncAndAuth.syncStatus}
-        onSelectTeam={registry.setActiveTeamId}
-        onSelectProject={registry.setActiveProjectId}
+        onSelectTeam={handleSelectTeam}
+        onSelectProject={handleSelectProject}
         onCreateTeam={registry.handleCreateTeam}
         onCreateProject={registry.handleCreateProject}
         onInviteMember={handleInviteMember}
@@ -166,7 +201,13 @@ export default function TeamPage(): React.JSX.Element {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <TeamWorkspaceSearch
+            board={board}
+            notes={notes}
+            onSelectCard={handleJumpToCard}
+            onSelectNote={handleJumpToNote}
+          />
           {boardMetrics && (
             <span className="text-2xs text-muted-foreground mr-1">
               {boardMetrics.completedCards}/{boardMetrics.totalCards} tareas ·{' '}
@@ -200,6 +241,8 @@ export default function TeamPage(): React.JSX.Element {
             humanMembers={registry.humanMembers}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
+            selectedCardId={focusedCardId}
+            onSelectedCardIdChange={setFocusedCardId}
             onPersist={handleBoardChange}
           />
         ) : activeTab === 'whiteboard' && whiteboard ? (
@@ -221,6 +264,8 @@ export default function TeamPage(): React.JSX.Element {
             currentUser={{ ...currentUserIdentity, color: '#8b5cf6' }}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
+            selectedNoteId={focusedNoteId}
+            onSelectNoteId={(noteId) => setFocusedNoteId(noteId ?? undefined)}
             onPersist={handleNotesChange}
             onExtractTasksToKanban={handleExtractTasksToKanban}
           />

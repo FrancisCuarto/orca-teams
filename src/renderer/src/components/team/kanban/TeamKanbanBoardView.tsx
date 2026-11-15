@@ -6,6 +6,7 @@ import type {
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import { DEFAULT_TEAM_HUMAN_MEMBERS } from '../../../../../shared/teamwork/team-members'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
 import { computeBoardSprintMetrics } from './team-kanban-board-mutations'
@@ -27,6 +28,8 @@ type Props = {
   currentUserId?: string
   currentUserName?: string
   humanMembers?: ExtendedTeamMember[]
+  selectedCardId?: string | null
+  onSelectedCardIdChange?: (cardId: string | null) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -37,6 +40,8 @@ export function TeamKanbanBoardView({
   currentUserId = 'usr-francis',
   currentUserName,
   humanMembers,
+  selectedCardId = null,
+  onSelectedCardIdChange,
   onChange
 }: Props): React.JSX.Element {
   const [editingCard, setEditingCard] = useState<TeamKanbanCard | null>(null)
@@ -62,7 +67,34 @@ export function TeamKanbanBoardView({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const cardMap = useMemo(() => board.cards, [board.cards])
   const metrics = useMemo(() => computeBoardSprintMetrics(board), [board])
-  const filters = useKanbanBoardFilters(board.columns, cardMap)
+
+  const pendingApprovalCardIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const [cardId, record] of executionsByCard.entries()) {
+      if (record.status === 'waiting_for_input') {
+        ids.add(cardId)
+      }
+    }
+    return ids
+  }, [executionsByCard])
+
+  const allBoardMembers = useMemo(() => {
+    const baseHumans =
+      humanMembers && humanMembers.length > 0 ? humanMembers : DEFAULT_TEAM_HUMAN_MEMBERS
+    const custom = board.customMembers ?? []
+    return Array.from(
+      new Map([...baseHumans, ...configuredAgents, ...custom].map((m) => [m.id, m])).values()
+    )
+  }, [humanMembers, configuredAgents, board.customMembers])
+
+  const filters = useKanbanBoardFilters({
+    columns: board.columns,
+    cardMap,
+    currentUserId,
+    currentUserName,
+    pendingApprovalCardIds,
+    members: allBoardMembers
+  })
 
   const actions = useKanbanBoardActions({
     board,
@@ -89,20 +121,35 @@ export function TeamKanbanBoardView({
     ? (executionsByCard.get(executionModalCardId) ?? null)
     : null
 
+  const externalEditingCard = selectedCardId ? (cardMap[selectedCardId] ?? null) : null
+  const effectiveIsModalOpen = isModalOpen || Boolean(externalEditingCard)
+  const effectiveEditingCard = isModalOpen ? editingCard : externalEditingCard
+  const effectiveTargetColumnId = isModalOpen ? targetColumnId : externalEditingCard?.columnId
+
   const handleOpenNewCard = useCallback(
     (colId?: string) => {
+      onSelectedCardIdChange?.(null)
       setEditingCard(null)
       setTargetColumnId(colId ?? board.columns[0]?.id)
       setIsModalOpen(true)
     },
-    [board.columns]
+    [board.columns, onSelectedCardIdChange]
   )
 
-  const handleEditCard = useCallback((card: TeamKanbanCard) => {
-    setEditingCard(card)
-    setTargetColumnId(card.columnId)
-    setIsModalOpen(true)
-  }, [])
+  const handleEditCard = useCallback(
+    (card: TeamKanbanCard) => {
+      onSelectedCardIdChange?.(null)
+      setEditingCard(card)
+      setTargetColumnId(card.columnId)
+      setIsModalOpen(true)
+    },
+    [onSelectedCardIdChange]
+  )
+
+  const handleCloseCardModal = useCallback(() => {
+    setIsModalOpen(false)
+    onSelectedCardIdChange?.(null)
+  }, [onSelectedCardIdChange])
 
   const handleAddColumn = useCallback(
     (title: string): void => {
@@ -116,14 +163,14 @@ export function TeamKanbanBoardView({
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-background">
       <TeamKanbanToolbar
-        searchQuery={filters.searchQuery}
-        selectedPriority={filters.selectedPriority}
-        selectedFilterMember={filters.selectedFilterMember}
+        filters={filters.filters}
         statusFilter={filters.statusFilter}
+        myPendingCount={filters.myPendingCount}
+        availableLabels={filters.availableLabels}
+        assigneeOptions={filters.assigneeOptions}
         filteredCount={filters.filteredCards.length}
         filteredPoints={filters.filteredPoints}
-        onSearchChange={filters.setSearchQuery}
-        onPriorityChange={filters.setSelectedPriority}
+        onFiltersChange={filters.setFilters}
         onStatusFilterChange={filters.setStatusFilter}
         onClearFilters={filters.handleClearFilters}
         onCreateTask={() => handleOpenNewCard()}
@@ -172,14 +219,14 @@ export function TeamKanbanBoardView({
       </DndContext>
 
       <TeamKanbanCardModal
-        isOpen={isModalOpen}
-        card={editingCard}
+        isOpen={effectiveIsModalOpen}
+        card={effectiveEditingCard}
         columns={board.columns}
-        defaultColumnId={targetColumnId}
+        defaultColumnId={effectiveTargetColumnId}
         configuredAgents={configuredAgents}
         humanMembers={humanMembers}
         availableMembers={board.customMembers}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseCardModal}
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
         onDispatchAgent={actions.handleDispatchAgent}

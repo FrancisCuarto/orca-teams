@@ -20,6 +20,8 @@ type Props = {
   humanMembers?: ExtendedTeamMember[]
   relayUrl?: string | null
   syncToken?: string
+  selectedCardId?: string | null
+  onSelectedCardIdChange?: (cardId: string | null) => void
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -31,6 +33,8 @@ export function TeamKanbanConnectedView({
   humanMembers,
   relayUrl,
   syncToken,
+  selectedCardId,
+  onSelectedCardIdChange,
   onPersist
 }: Props): React.JSX.Element {
   const { board, presences, syncStatus, syncBoard } = useTeamKanbanSync({
@@ -68,6 +72,8 @@ export function TeamKanbanConnectedView({
         currentUserId={currentUser.userId}
         currentUserName={currentUser.displayName}
         humanMembers={humanMembers}
+        selectedCardId={selectedCardId}
+        onSelectedCardIdChange={onSelectedCardIdChange}
         onChange={syncBoard}
       />
     </div>
