@@ -4,6 +4,7 @@ import type {
   TeamApproveExecutionRequest,
   TeamExecutionEvent,
   TeamRejectExecutionRequest,
+  TeamRequestExecutionChangesRequest,
   TeamSendInvitationRequest,
   TeamSendInvitationResult,
   TeamStartExecutionRequest
@@ -182,6 +183,33 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     }
     return updated
   })
+
+  ipcMain.handle('team:getExecutionDiff', (_event, executionId: string) =>
+    runner.getExecutionDiff(executionId)
+  )
+
+  ipcMain.handle(
+    'team:requestExecutionChanges',
+    async (_event, request: TeamRequestExecutionChangesRequest) => {
+      const updated = await runner.requestExecutionChanges(request, broadcastExecutionEvent)
+      if (updated) {
+        broadcastExecutionEvent({ type: 'updated', execution: updated })
+        const preview = request.feedback.trim().slice(0, 120)
+        recordSystemActivity({
+          teamId: resolveTeamIdForProject(updated.projectId),
+          projectId: updated.projectId,
+          actorId: request.actorUserId ?? 'local-owner',
+          actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+          actorType: 'human',
+          action: 'execution.changes_requested',
+          targetType: 'execution',
+          targetId: updated.id,
+          summary: `Solicitó correcciones a ${updated.agentId}: ${preview}`
+        })
+      }
+      return updated
+    }
+  )
 
   ipcMain.handle('team:getExecution', (_event, executionId: string) =>
     runner.getExecution(executionId)

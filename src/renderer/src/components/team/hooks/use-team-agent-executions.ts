@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   TeamApproveExecutionRequest,
+  TeamExecutionDiffResult,
   TeamRejectExecutionRequest,
+  TeamRequestExecutionChangesRequest,
   TeamStartExecutionRequest
 } from '../../../../../shared/teamwork/team-ipc-types'
 import type {
@@ -24,6 +26,10 @@ export type UseTeamAgentExecutionsResult = {
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   approveExecution: (options: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
   rejectExecution: (options: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
+  getExecutionDiff: (executionId: string) => Promise<TeamExecutionDiffResult | null>
+  requestExecutionChanges: (
+    options: TeamRequestExecutionChangesRequest
+  ) => Promise<AgentExecutionRecord | null>
   getLatestForCard: (cardId: string) => AgentExecutionRecord | null
   hydrateLatestForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
 }
@@ -144,6 +150,32 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     [recordExecution]
   )
 
+  const getExecutionDiff = useCallback(
+    async (executionId: string): Promise<TeamExecutionDiffResult | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.getExecutionDiff) {
+        return null
+      }
+      return teamApi.getExecutionDiff(executionId)
+    },
+    []
+  )
+
+  const requestExecutionChanges = useCallback(
+    async (options: TeamRequestExecutionChangesRequest): Promise<AgentExecutionRecord | null> => {
+      const teamApi = getTeamApi()
+      if (!teamApi?.requestExecutionChanges) {
+        return null
+      }
+      const updated = await teamApi.requestExecutionChanges(options)
+      if (updated) {
+        recordExecution(updated)
+      }
+      return updated
+    },
+    [recordExecution]
+  )
+
   const getLatestForCard = useCallback(
     (cardId: string): AgentExecutionRecord | null => executionsByCard.get(cardId) ?? null,
     [executionsByCard]
@@ -180,6 +212,8 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
     cancelExecution,
     approveExecution,
     rejectExecution,
+    getExecutionDiff,
+    requestExecutionChanges,
     getLatestForCard,
     hydrateLatestForCard
   }

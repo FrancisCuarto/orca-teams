@@ -193,19 +193,20 @@ export class TeamHostDatabase {
     this.db
       .prepare(
         `UPDATE agent_executions
-         SET status = ?, logs_json = ?, output_summary = ?, error = ?,
+         SET status = ?, prompt = ?, logs_json = ?, output_summary = ?, error = ?,
              branch_or_worktree = COALESCE(?, branch_or_worktree),
              worktree_path = COALESCE(?, worktree_path),
              base_branch = COALESCE(?, base_branch),
-             approval_status = COALESCE(?, approval_status),
-             changed_files_json = COALESCE(?, changed_files_json),
+             approval_status = ?,
+             changed_files_json = ?,
              started_at = COALESCE(?, started_at),
-             completed_at = COALESCE(?, completed_at),
+             completed_at = ?,
              updated_at = ?
          WHERE id = ?`
       )
       .run(
         record.status,
+        record.prompt,
         JSON.stringify(record.logs),
         record.outputSummary ?? null,
         record.error ?? null,

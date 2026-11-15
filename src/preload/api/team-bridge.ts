@@ -6,6 +6,7 @@ import type {
   TeamExecutionEvent,
   TeamMailConfigInput,
   TeamRejectExecutionRequest,
+  TeamRequestExecutionChangesRequest,
   TeamSendInvitationRequest,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
@@ -24,6 +25,10 @@ export const teamApi: TeamApi = {
     ipcRenderer.invoke('team:approveExecution', request),
   rejectExecution: (request: TeamRejectExecutionRequest) =>
     ipcRenderer.invoke('team:rejectExecution', request),
+  getExecutionDiff: (executionId: string) =>
+    ipcRenderer.invoke('team:getExecutionDiff', executionId),
+  requestExecutionChanges: (request: TeamRequestExecutionChangesRequest) =>
+    ipcRenderer.invoke('team:requestExecutionChanges', request),
   getExecution: (executionId: string) => ipcRenderer.invoke('team:getExecution', executionId),
   getLatestExecutionForCard: (cardId: string) =>
     ipcRenderer.invoke('team:getLatestExecutionForCard', cardId),

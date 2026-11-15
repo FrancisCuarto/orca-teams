@@ -117,12 +117,43 @@ export type TeamRejectExecutionRequest = {
   actorName?: string
 }
 
+export type TeamRequestExecutionChangesRequest = {
+  executionId: string
+  feedback: string
+  actorUserId?: string
+  actorName?: string
+}
+
+export type TeamExecutionDiffFileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+
+export type TeamExecutionDiffFile = {
+  path: string
+  status: TeamExecutionDiffFileStatus
+  additions: number
+  deletions: number
+}
+
+export type TeamExecutionDiffResult = {
+  executionId: string
+  worktreePath?: string
+  baseBranch?: string
+  branch?: string
+  files: TeamExecutionDiffFile[]
+  diff: string
+  truncated: boolean
+  error?: string
+}
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
   cancelExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   approveExecution: (request: TeamApproveExecutionRequest) => Promise<AgentExecutionRecord | null>
   rejectExecution: (request: TeamRejectExecutionRequest) => Promise<AgentExecutionRecord | null>
+  getExecutionDiff: (executionId: string) => Promise<TeamExecutionDiffResult>
+  requestExecutionChanges: (
+    request: TeamRequestExecutionChangesRequest
+  ) => Promise<AgentExecutionRecord | null>
   getExecution: (executionId: string) => Promise<AgentExecutionRecord | null>
   getLatestExecutionForCard: (cardId: string) => Promise<AgentExecutionRecord | null>
   onExecutionEvent: (callback: (event: TeamExecutionEvent) => void) => () => void

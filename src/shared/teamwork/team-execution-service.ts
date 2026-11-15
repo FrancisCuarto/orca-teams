@@ -172,6 +172,33 @@ export class TeamExecutionService {
     )
   }
 
+  repromptAgentExecution(options: {
+    executionId: string
+    prompt: string
+    status?: AgentExecutionStatus
+  }): AgentExecutionRecord | null {
+    const existing = this.getAgentExecution(options.executionId)
+    if (!existing) {
+      return null
+    }
+    const now = Date.now()
+    const nextStatus = options.status ?? 'queued'
+    this.db
+      .prepare(
+        `UPDATE agent_executions
+         SET status = ?,
+             prompt = ?,
+             approval_status = NULL,
+             output_summary = NULL,
+             error = NULL,
+             completed_at = NULL,
+             updated_at = ?
+         WHERE id = ?`
+      )
+      .run(nextStatus, options.prompt, now, options.executionId)
+    return this.getAgentExecution(options.executionId)
+  }
+
   appendAgentExecutionLog(executionId: string, log: AgentExecutionLog): void {
     const existing = this.getAgentExecution(executionId)
     if (!existing) {
