@@ -152,6 +152,17 @@ describe('Software Factory Kanban UI integration', () => {
       listConfiguredAgents: vi.fn(async () => []),
       startExecution: vi.fn(),
       cancelExecution: vi.fn(async () => null),
+      approveExecution: vi.fn(async () => null),
+      createReviewRequest: vi.fn(async () => null),
+      refreshReviewRequest: vi.fn(async () => null),
+      rejectExecution: vi.fn(async () => null),
+      getExecutionDiff: vi.fn(async (executionId: string) => ({
+        executionId,
+        files: [],
+        diff: '',
+        truncated: false
+      })),
+      requestExecutionChanges: vi.fn(async () => null),
       getExecution: vi.fn(async () => null),
       getLatestExecutionForCard: vi.fn(async () => null),
       onExecutionEvent: vi.fn(() => () => {}),
@@ -169,6 +180,8 @@ describe('Software Factory Kanban UI integration', () => {
       getLatestFactoryRunForCard: vi.fn(async () => waitingRun),
       listFactoryRuns: vi.fn(async () => []),
       onFactoryEvent: vi.fn(() => () => {}),
+      onDeepLinkJoin: vi.fn(() => () => {}),
+      consumePendingDeepLinkJoin: vi.fn(async () => null),
       getWorkspaceSnapshot: vi.fn(async () => ({
         teams: [],
         projects: [],
@@ -183,7 +196,19 @@ describe('Software Factory Kanban UI integration', () => {
       revokeInvitation: vi.fn(),
       getMailConfig: vi.fn(),
       saveMailConfig: vi.fn(),
-      testMailConfig: vi.fn()
+      testMailConfig: vi.fn(),
+      listActivity: vi.fn(async () => []),
+      recordActivity: vi.fn(),
+      getCurrentUser: vi.fn(),
+      updateUserProfile: vi.fn(),
+      requestMagicLinkCode: vi.fn(),
+      verifyMagicLinkCode: vi.fn(),
+      getSyncStatus: vi.fn(),
+      configureSync: vi.fn(),
+      listCardComments: vi.fn(async () => []),
+      addCardComment: vi.fn(),
+      deleteCardComment: vi.fn(async () => true),
+      fetchExternalIssues: vi.fn(async () => [])
     }
 
     Object.defineProperty(window, 'api', {

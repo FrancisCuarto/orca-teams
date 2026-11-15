@@ -31,11 +31,9 @@ function createBoard(): TeamKanbanBoard {
         labels: [],
         checklist: [],
         assignee: {
-          id: 'agent-codex',
           name: 'Codex',
           type: 'agent',
-          role: 'Coder',
-          color: '#3b82f6'
+          agentType: 'codex'
         },
         createdAt: 1000,
         updatedAt: 1000
@@ -101,8 +99,12 @@ describe('Team RBAC UI enforcement', () => {
     const createBtn = screen.getByRole('button', { name: /nueva tarea/i })
     expect(createBtn.hasAttribute('disabled')).toBe(true)
 
-    const runBtn = screen.getByRole('button', { name: /ejecutar/i })
+    const runBtn = screen.getByRole('button', { name: /^ejecutar$/i })
     expect(runBtn.hasAttribute('disabled')).toBe(true)
+
+    const factoryBtns = screen.getAllByRole('button', { name: /^factory$/i })
+    expect(factoryBtns.length).toBeGreaterThanOrEqual(1)
+    expect(factoryBtns.every((btn) => btn.hasAttribute('disabled'))).toBe(true)
 
     expect(screen.queryByRole('button', { name: /añadir columna/i })).toBeNull()
     expect(onChange).not.toHaveBeenCalled()

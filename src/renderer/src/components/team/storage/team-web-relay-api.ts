@@ -1,18 +1,36 @@
+import {
+  createDefaultFactoryConfig,
+  type FactoryConfig,
+  type FactoryRunRecord
+} from '../../../../../shared/teamwork/team-factory-types'
 import type {
   ConfiguredTeamAgent,
+  TeamAddCardCommentRequest,
   TeamApi,
   TeamApproveExecutionRequest,
+  TeamCreateReviewRequestRequest,
+  TeamDeepLinkJoinPayload,
+  TeamExecutionDiffResult,
+  TeamFetchExternalIssuesRequest,
   TeamMailConfigInput,
   TeamMailConfigPublic,
   TeamMailProvider,
   TeamMemberWithProfile,
+  TeamRefreshReviewRequestRequest,
   TeamRejectExecutionRequest,
+  TeamRequestExecutionChangesRequest,
+  TeamResolveFactoryGateRequest,
   TeamSendInvitationRequest,
   TeamSendInvitationResult,
   TeamStartExecutionRequest,
+  TeamStartFactoryRunRequest,
   TeamSyncRuntimeStatus,
   TeamWorkspaceSnapshot
 } from '../../../../../shared/teamwork/team-ipc-types'
+import type {
+  ExternalTeamIssue,
+  TeamCardComment
+} from '../../../../../shared/teamwork/team-kanban-types'
 import {
   isTeamRole,
   type AgentApprovalStatus,
@@ -669,7 +687,8 @@ function parseAgentExecutionRecord(raw: unknown): AgentExecutionRecord | null {
       : undefined,
     changedFiles: parseStringArray(candidate.changedFiles),
     logs,
-    outputSummary: typeof candidate.outputSummary === 'string' ? candidate.outputSummary : undefined,
+    outputSummary:
+      typeof candidate.outputSummary === 'string' ? candidate.outputSummary : undefined,
     idempotencyKey: candidate.idempotencyKey,
     startedAt: typeof candidate.startedAt === 'number' ? candidate.startedAt : undefined,
     completedAt: typeof candidate.completedAt === 'number' ? candidate.completedAt : undefined,
@@ -856,7 +875,10 @@ function defaultMailConfigPublic(): TeamMailConfigPublic {
 }
 
 function isUnsupportedExecutionStatus(error: unknown): boolean {
-  return error instanceof RelayHttpError && (error.status === 404 || error.status === 405 || error.status === 501)
+  return (
+    error instanceof RelayHttpError &&
+    (error.status === 404 || error.status === 405 || error.status === 501)
+  )
 }
 
 export function createWebRelayTeamApi(): TeamApi {
@@ -1018,9 +1040,7 @@ export function createWebRelayTeamApi(): TeamApi {
       )
     },
 
-    sendInvitation: async (
-      request: TeamSendInvitationRequest
-    ): Promise<TeamSendInvitationResult> =>
+    sendInvitation: async (request: TeamSendInvitationRequest): Promise<TeamSendInvitationResult> =>
       relayFetch('/api/invitations', { method: 'POST', body: request }, parseSendInvitationResult),
 
     resendInvitation: async (
@@ -1093,16 +1113,18 @@ export function createWebRelayTeamApi(): TeamApi {
       if (typeof options.limit === 'number') {
         query.set('limit', String(options.limit))
       }
-      return relayFetch(`/api/activity?${query.toString()}`, { method: 'GET' }, parseTeamActivityList)
+      return relayFetch(
+        `/api/activity?${query.toString()}`,
+        { method: 'GET' },
+        parseTeamActivityList
+      )
     },
 
     recordActivity: async (
       entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>
     ): Promise<TeamActivityEntry> =>
-      relayFetch(
-        '/api/activity',
-        { method: 'POST', body: entry },
-        (raw) => parseTeamActivityEntry(unwrapCandidate(raw, ['entry']))
+      relayFetch('/api/activity', { method: 'POST', body: entry }, (raw) =>
+        parseTeamActivityEntry(unwrapCandidate(raw, ['entry']))
       ),
 
     getCurrentUser: async (): Promise<TeamUserProfile> =>
@@ -1171,20 +1193,101 @@ export function createWebRelayTeamApi(): TeamApi {
 
     getSyncStatus: async (): Promise<TeamSyncRuntimeStatus> => buildSyncRuntimeStatusFromConfig(),
 
-    configureSync: async (
-      settings: Partial<TeamSyncSettings>
-    ): Promise<TeamSyncRuntimeStatus> => {
+    configureSync: async (settings: Partial<TeamSyncSettings>): Promise<TeamSyncRuntimeStatus> => {
       const current = readWebPortalConnectionConfig()
       if (settings.mode === 'local') {
         saveWebPortalConnectionConfig({ relayUrl: '', roomSecret: '' })
       } else {
         saveWebPortalConnectionConfig({
           relayUrl: settings.relayUrl !== undefined ? settings.relayUrl : current.relayUrl,
-          roomSecret:
-            'roomSecret' in settings ? (settings.roomSecret ?? '') : current.roomSecret
+          roomSecret: 'roomSecret' in settings ? (settings.roomSecret ?? '') : current.roomSecret
         })
       }
       return buildSyncRuntimeStatusFromConfig()
+    },
+
+    createReviewRequest: async (
+      _request: TeamCreateReviewRequestRequest
+    ): Promise<AgentExecutionRecord | null> => {
+      throw new Error(
+        'La creación de Pull/Merge Requests desde worktrees locales solo está disponible en la app de escritorio Orca Teams.'
+      )
+    },
+
+    refreshReviewRequest: async (
+      _request: TeamRefreshReviewRequestRequest
+    ): Promise<AgentExecutionRecord | null> => null,
+
+    getExecutionDiff: async (executionId: string): Promise<TeamExecutionDiffResult> => ({
+      executionId,
+      files: [],
+      diff: '',
+      truncated: false,
+      error:
+        'La inspección de diffs de worktrees locales solo está disponible desde la app de escritorio host.'
+    }),
+
+    requestExecutionChanges: async (
+      _request: TeamRequestExecutionChangesRequest
+    ): Promise<AgentExecutionRecord | null> => {
+      throw new Error(
+        'Solicitar correcciones y re-ejecutar agentes locales solo está disponible desde la app de escritorio host.'
+      )
+    },
+
+    getFactoryConfig: async (projectId: string): Promise<FactoryConfig> =>
+      createDefaultFactoryConfig(projectId),
+
+    saveFactoryConfig: async (config: FactoryConfig): Promise<FactoryConfig> => config,
+
+    startFactoryRun: async (_request: TeamStartFactoryRunRequest): Promise<FactoryRunRecord> => {
+      throw new Error(
+        'La ejecución de Software Factory requiere agentes CLI locales en la app de escritorio Orca Teams.'
+      )
+    },
+
+    cancelFactoryRun: async (_runId: string): Promise<FactoryRunRecord | null> => null,
+
+    resolveFactoryHumanGate: async (
+      _request: TeamResolveFactoryGateRequest
+    ): Promise<FactoryRunRecord | null> => null,
+
+    getFactoryRun: async (_runId: string): Promise<FactoryRunRecord | null> => null,
+
+    getLatestFactoryRunForCard: async (_cardId: string): Promise<FactoryRunRecord | null> => null,
+
+    listFactoryRuns: async (_projectId: string): Promise<FactoryRunRecord[]> => [],
+
+    onFactoryEvent: (): (() => void) => () => {},
+
+    onDeepLinkJoin:
+      (_callback: (payload: TeamDeepLinkJoinPayload) => void): (() => void) =>
+      () => {},
+
+    consumePendingDeepLinkJoin: async (): Promise<TeamDeepLinkJoinPayload | null> => null,
+
+    listCardComments: async (_cardId: string): Promise<TeamCardComment[]> => [],
+
+    addCardComment: async (request: TeamAddCardCommentRequest): Promise<TeamCardComment> => ({
+      id: request.id ?? `cmt-${Date.now()}`,
+      cardId: request.cardId,
+      projectId: request.projectId,
+      authorId: request.authorId,
+      authorName: request.authorName,
+      authorType: request.authorType ?? 'human',
+      body: request.body,
+      mentions: request.mentions ?? [],
+      createdAt: request.createdAt ?? Date.now()
+    }),
+
+    deleteCardComment: async (_commentId: string): Promise<boolean> => true,
+
+    fetchExternalIssues: async (
+      _request: TeamFetchExternalIssuesRequest
+    ): Promise<ExternalTeamIssue[]> => {
+      throw new Error(
+        'La importación directa de issues desde GitHub/Linear solo está disponible desde la app de escritorio host.'
+      )
     }
   }
 }
@@ -1199,12 +1302,10 @@ export function getWebRelayTeamApi(): TeamApi {
 }
 
 function isNativeElectronTeamApi(candidate: unknown): candidate is TeamApi {
-  return (
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    'getWorkspaceSnapshot' in candidate &&
-    typeof candidate.getWorkspaceSnapshot === 'function'
-  )
+  if (typeof candidate !== 'object' || candidate === null) {
+    return false
+  }
+  return Object.values(candidate).some((value) => typeof value === 'function')
 }
 
 export function isElectronTeamPreloadAvailable(): boolean {

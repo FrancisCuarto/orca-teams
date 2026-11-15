@@ -124,11 +124,18 @@ export function TeamKanbanCardAgentBadge({
         <Button
           size="xs"
           variant="ghost"
-          title="Ejecutar pipeline completo Software Factory (Spec → TDD → 4 Revisores → Gate)"
+          disabled={!canDispatchAgents}
+          title={
+            canDispatchAgents
+              ? 'Ejecutar pipeline completo Software Factory (Spec → TDD → 4 Revisores → Gate)'
+              : 'Solo lectura: no puedes ejecutar Software Factory'
+          }
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
-            onStartFactory(card)
+            if (canDispatchAgents) {
+              onStartFactory(card)
+            }
           }}
         >
           <Factory className="size-3 text-primary mr-1 inline" />

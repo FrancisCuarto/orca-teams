@@ -182,7 +182,7 @@ export function useTeamAgentExecutions(
 
   const createReviewRequest = useCallback(
     async (options: TeamCreateReviewRequestRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.createReviewRequest) {
         return null
       }
@@ -197,7 +197,7 @@ export function useTeamAgentExecutions(
 
   const refreshReviewRequest = useCallback(
     async (options: TeamRefreshReviewRequestRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.refreshReviewRequest) {
         return null
       }
@@ -227,7 +227,7 @@ export function useTeamAgentExecutions(
 
   const getExecutionDiff = useCallback(
     async (executionId: string): Promise<TeamExecutionDiffResult | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.getExecutionDiff) {
         return null
       }
@@ -238,7 +238,7 @@ export function useTeamAgentExecutions(
 
   const requestExecutionChanges = useCallback(
     async (options: TeamRequestExecutionChangesRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.requestExecutionChanges) {
         return null
       }

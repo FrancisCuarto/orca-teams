@@ -68,8 +68,17 @@ export function TeamKanbanToolbar({
             type="button"
             size="sm"
             variant="outline"
-            onClick={onOpenFactoryConfig}
-            title="Configurar roles, checks y gate determinista de Software Factory"
+            disabled={!canCreateTask}
+            onClick={() => {
+              if (canCreateTask) {
+                onOpenFactoryConfig()
+              }
+            }}
+            title={
+              canCreateTask
+                ? 'Configurar roles, checks y gate determinista de Software Factory'
+                : 'Solo lectura: no puedes configurar Software Factory'
+            }
           >
             <Factory className="size-3.5" />
             <span>Factory</span>
