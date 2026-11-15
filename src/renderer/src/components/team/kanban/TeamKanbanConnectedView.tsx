@@ -3,6 +3,7 @@ import type {
   ExtendedTeamMember,
   TeamKanbanBoard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useTeamKanbanSync } from '../hooks/use-team-kanban-sync'
 import { TeamBoardPresenceBar } from './TeamBoardPresenceBar'
 import { TeamKanbanBoardView } from './TeamKanbanBoardView'
@@ -21,6 +22,7 @@ type Props = {
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
 
 export function TeamKanbanConnectedView({
@@ -31,16 +33,18 @@ export function TeamKanbanConnectedView({
   humanMembers,
   relayUrl,
   syncToken,
-  onPersist
+  onPersist,
+  onPeersChange
 }: Props): React.JSX.Element {
-  const { board, presences, syncStatus, syncBoard } = useTeamKanbanSync({
+  const { board, presences, peers, syncStatus, syncBoard, updateActiveCard } = useTeamKanbanSync({
     boardId: initialBoard.id,
     projectId,
     currentUser,
     relayUrl,
     syncToken,
     initialBoard,
-    onPersist
+    onPersist,
+    onPeersChange
   })
 
   const activeBoard = board ?? initialBoard
@@ -68,6 +72,8 @@ export function TeamKanbanConnectedView({
         currentUserId={currentUser.userId}
         currentUserName={currentUser.displayName}
         humanMembers={humanMembers}
+        peers={peers}
+        onActiveCardChange={updateActiveCard}
         onChange={syncBoard}
       />
     </div>

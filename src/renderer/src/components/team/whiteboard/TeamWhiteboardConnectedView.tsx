@@ -1,5 +1,6 @@
 import React from 'react'
 import type { TeamWhiteboard } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useTeamWhiteboardSync } from '../hooks/use-team-whiteboard-sync'
 import { TeamWhiteboardView } from './TeamWhiteboardView'
 
@@ -16,6 +17,7 @@ type Props = {
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (wb: TeamWhiteboard) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
   onCreateTask?: (item: TeamWhiteboard['items'][number]) => void
 }
 
@@ -27,21 +29,25 @@ export function TeamWhiteboardConnectedView({
   relayUrl,
   syncToken,
   onPersist,
+  onPeersChange,
   onCreateTask
 }: Props): React.JSX.Element {
-  const { whiteboard, remoteCursors, syncWhiteboard, broadcastCursor } = useTeamWhiteboardSync({
-    whiteboardId,
-    projectId,
-    initialWhiteboard,
-    currentUser,
-    relayUrl,
-    syncToken,
-    onPersist
-  })
+  const { whiteboard, peers, remoteCursors, syncWhiteboard, broadcastCursor } =
+    useTeamWhiteboardSync({
+      whiteboardId,
+      projectId,
+      initialWhiteboard,
+      currentUser,
+      relayUrl,
+      syncToken,
+      onPersist,
+      onPeersChange
+    })
 
   return (
     <TeamWhiteboardView
       whiteboard={whiteboard ?? initialWhiteboard}
+      peers={peers}
       remoteCursors={remoteCursors}
       onCursorMove={broadcastCursor}
       onChange={(updated) => {

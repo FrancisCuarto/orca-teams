@@ -49,6 +49,8 @@ describe('useTeamWhiteboardSync', () => {
     expect(result.current.syncStatus).toBe('connected')
     expect(result.current.whiteboard?.title).toBe('Pizarra de Prueba')
     expect(result.current.whiteboard?.items).toHaveLength(1)
+    expect(result.current.presences).toHaveLength(1)
+    expect(result.current.peers).toEqual([])
     expect(result.current.remoteCursors).toEqual([])
   })
 

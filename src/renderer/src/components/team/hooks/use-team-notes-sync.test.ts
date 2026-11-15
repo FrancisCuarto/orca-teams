@@ -46,6 +46,7 @@ describe('useTeamNotesSync', () => {
     expect(result.current.notesCollection?.notes[0]?.title).toBe('ADR 001')
     expect(result.current.presences).toHaveLength(1)
     expect(result.current.presences[0]?.userId).toBe('user-1')
+    expect(result.current.peers).toEqual([])
   })
 
   it('permite añadir notas con upsertNote y llama a onPersist', () => {

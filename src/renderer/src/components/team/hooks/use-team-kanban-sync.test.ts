@@ -54,6 +54,7 @@ describe('useTeamKanbanSync', () => {
     expect(result.current.board?.columns[0].cardIds).toEqual(['card-1'])
     expect(result.current.presences).toHaveLength(1)
     expect(result.current.presences[0].userId).toBe('user-1')
+    expect(result.current.peers).toEqual([])
   })
 
   it('permite upsertCard y notifica persistencia', () => {

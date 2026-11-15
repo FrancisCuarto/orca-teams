@@ -6,6 +6,7 @@ import type {
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import type { AgentExecutionStatus } from '../../../../../shared/teamwork/team-workspace-types'
 import { Badge } from '@/components/ui/badge'
 import { TeamKanbanCardAgentBadge } from './TeamKanbanCardAgentBadge'
@@ -13,6 +14,7 @@ import { TeamKanbanCardAgentBadge } from './TeamKanbanCardAgentBadge'
 type Props = {
   card: TeamKanbanCard
   columns?: TeamKanbanColumn[]
+  activePeers?: CollaboratorPresence[]
   onEdit: (card: TeamKanbanCard) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
   executionStatus?: AgentExecutionStatus
@@ -35,6 +37,7 @@ const PRIORITY_STYLES: Record<
 export function TeamKanbanCardItem({
   card,
   columns,
+  activePeers,
   onEdit,
   onDispatchAgent,
   executionStatus,
@@ -57,6 +60,7 @@ export function TeamKanbanCardItem({
   const priority = PRIORITY_STYLES[card.priority] ?? PRIORITY_STYLES.medium
   const completedChecklist = card.checklist?.filter((item) => item.done).length ?? 0
   const totalChecklist = card.checklist?.length ?? 0
+  const hasActivePeers = Boolean(activePeers && activePeers.length > 0)
 
   return (
     <div
@@ -68,9 +72,41 @@ export function TeamKanbanCardItem({
       className={`group relative flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing ${
         isOver
           ? 'ring-2 ring-ring border-ring bg-accent/60 shadow-floating scale-[1.01]'
-          : 'border-border hover:border-ring/50'
+          : hasActivePeers
+            ? 'border-primary/60 ring-1 ring-primary/30'
+            : 'border-border hover:border-ring/50'
       } ${isOverlay ? 'shadow-floating ring-2 ring-ring/50 rotate-1' : ''}`}
     >
+      {/* Live Collaborator Badges */}
+      {activePeers && activePeers.length > 0 ? (
+        <div
+          data-testid={`card-live-editors-${card.id}`}
+          className="flex flex-wrap items-center gap-1"
+        >
+          {activePeers.slice(0, 2).map((peer) => (
+            <span
+              key={peer.userId}
+              data-testid={`card-live-editor-${card.id}-${peer.userId}`}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/90 px-1.5 py-0.5 text-3xs font-medium text-foreground shadow-xs"
+              style={{ borderColor: peer.color }}
+              title={`${peer.displayName} está editando esta tarjeta`}
+            >
+              <span
+                className="size-1.5 rounded-full animate-pulse shrink-0"
+                style={{ backgroundColor: peer.color }}
+              />
+              <span className="truncate max-w-[90px]">{peer.displayName}</span>
+              <span className="text-muted-foreground">editando</span>
+            </span>
+          ))}
+          {activePeers.length > 2 ? (
+            <span className="text-3xs text-muted-foreground px-1">
+              +{activePeers.length - 2}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Top Header: Priority & Story Points */}
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">

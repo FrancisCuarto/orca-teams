@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type {
   TeamNote,
   TeamNoteCategory,
@@ -23,12 +23,14 @@ export type UseTeamNotesSyncOptions = {
   syncToken?: string
   initialNotes?: TeamNotesCollection | null
   onPersist?: (collection: TeamNotesCollection) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
 
 export type UseTeamNotesSyncReturn = {
   notesCollection: TeamNotesCollection | null
   syncStatus: SyncStatus
   presences: CollaboratorPresence[]
+  peers: CollaboratorPresence[]
   activeNoteId: string | null
   setActiveNoteId: (noteId: string | null) => void
   upsertNote: (note: TeamNote) => void
@@ -44,21 +46,26 @@ export function useTeamNotesSync({
   relayUrl,
   syncToken,
   initialNotes,
-  onPersist
+  onPersist,
+  onPeersChange
 }: UseTeamNotesSyncOptions): UseTeamNotesSyncReturn {
+  const initialFirstNoteId = initialNotes?.notes[0]?.id ?? null
   const [notesCollection, setNotesCollection] = useState<TeamNotesCollection | null>(
     initialNotes ?? null
   )
   const [presences, setPresences] = useState<CollaboratorPresence[]>([])
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing')
-  const [activeNoteId, setActiveNoteIdState] = useState<string | null>(null)
+  const [activeNoteId, setActiveNoteIdState] = useState<string | null>(initialFirstNoteId)
 
   const crdtRef = useRef<TeamNotesCRDT | null>(null)
   const roomProviderRef = useRef<TeamRoomProvider | null>(null)
+  const activeNoteIdRef = useRef<string | null>(initialFirstNoteId)
   const initialNotesRef = useRef(initialNotes)
   initialNotesRef.current = initialNotes
   const onPersistRef = useRef(onPersist)
   onPersistRef.current = onPersist
+  const onPeersChangeRef = useRef(onPeersChange)
+  onPeersChangeRef.current = onPeersChange
 
   useEffect(() => {
     const roomId = `project:${projectId}:notes:collection`
@@ -90,7 +97,8 @@ export function useTeamNotesSync({
       userId: currentUser.userId,
       displayName: currentUser.displayName,
       avatarUrl: currentUser.avatarUrl,
-      color: currentUser.color ?? '#8b5cf6'
+      color: currentUser.color ?? '#8b5cf6',
+      activeNoteId: activeNoteIdRef.current ?? undefined
     })
 
     const unsubscribeNotes = crdt.subscribe((updated) => {
@@ -102,10 +110,22 @@ export function useTeamNotesSync({
 
     const unsubscribePresence = room.onPresenceChange((activePresences) => {
       setPresences(activePresences)
+      if (onPeersChangeRef.current) {
+        onPeersChangeRef.current(
+          activePresences.filter((p) => p.userId !== currentUser.userId)
+        )
+      }
     })
 
     const presenceInterval = setInterval(() => {
       room.cleanStalePresences()
+      room.updatePresence({
+        userId: currentUser.userId,
+        displayName: currentUser.displayName,
+        avatarUrl: currentUser.avatarUrl,
+        color: currentUser.color ?? '#8b5cf6',
+        activeNoteId: activeNoteIdRef.current ?? undefined
+      })
     }, 15000)
 
     return () => {
@@ -113,6 +133,7 @@ export function useTeamNotesSync({
       unsubscribeStatus()
       unsubscribeNotes()
       unsubscribePresence()
+      onPeersChangeRef.current?.([])
       room.destroy()
       crdt.destroy()
       crdtRef.current = null
@@ -128,8 +149,14 @@ export function useTeamNotesSync({
     currentUser.color
   ])
 
+  const peers = useMemo(
+    () => presences.filter((p) => p.userId !== currentUser.userId),
+    [presences, currentUser.userId]
+  )
+
   const setActiveNoteId = useCallback(
     (noteId: string | null) => {
+      activeNoteIdRef.current = noteId
       setActiveNoteIdState(noteId)
       roomProviderRef.current?.updatePresence({
         userId: currentUser.userId,
@@ -166,6 +193,7 @@ export function useTeamNotesSync({
     notesCollection,
     syncStatus,
     presences,
+    peers,
     activeNoteId,
     setActiveNoteId,
     upsertNote,

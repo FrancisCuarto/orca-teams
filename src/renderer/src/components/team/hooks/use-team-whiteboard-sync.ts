@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type {
   TeamWhiteboard,
   TeamWhiteboardItem
@@ -7,7 +7,10 @@ import { TeamWhiteboardCRDT } from '../../../../../shared/teamwork/realtime/team
 import { TeamRoomProvider } from '../../../../../shared/teamwork/realtime/team-room-provider'
 import { TeamWebSocketTransport } from '../../../../../shared/teamwork/realtime/team-ws-transport'
 import type { SyncStatus } from './use-team-kanban-sync'
-import type { WhiteboardCursorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
+import type {
+  CollaboratorPresence,
+  WhiteboardCursorPresence
+} from '../../../../../shared/teamwork/realtime/team-crdt-types'
 
 export type UseTeamWhiteboardSyncOptions = {
   whiteboardId: string
@@ -22,11 +25,14 @@ export type UseTeamWhiteboardSyncOptions = {
   syncToken?: string
   initialWhiteboard?: TeamWhiteboard | null
   onPersist?: (whiteboard: TeamWhiteboard) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
 
 export type UseTeamWhiteboardSyncReturn = {
   whiteboard: TeamWhiteboard | null
   syncStatus: SyncStatus
+  presences: CollaboratorPresence[]
+  peers: CollaboratorPresence[]
   remoteCursors: WhiteboardCursorPresence[]
   upsertItem: (item: TeamWhiteboardItem) => void
   moveItem: (itemId: string, x: number, y: number) => void
@@ -46,19 +52,23 @@ export function useTeamWhiteboardSync({
   relayUrl,
   syncToken,
   initialWhiteboard,
-  onPersist
+  onPersist,
+  onPeersChange
 }: UseTeamWhiteboardSyncOptions): UseTeamWhiteboardSyncReturn {
   const [whiteboard, setWhiteboard] = useState<TeamWhiteboard | null>(initialWhiteboard ?? null)
-  const [remoteCursors, setRemoteCursors] = useState<WhiteboardCursorPresence[]>([])
+  const [presences, setPresences] = useState<CollaboratorPresence[]>([])
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing')
 
   const crdtRef = useRef<TeamWhiteboardCRDT | null>(null)
   const roomProviderRef = useRef<TeamRoomProvider | null>(null)
   const lastCursorBroadcastRef = useRef<number>(0)
+  const lastCursorRef = useRef<{ x: number; y: number } | undefined>(undefined)
   const initialWhiteboardRef = useRef(initialWhiteboard)
   initialWhiteboardRef.current = initialWhiteboard
   const onPersistRef = useRef(onPersist)
   onPersistRef.current = onPersist
+  const onPeersChangeRef = useRef(onPeersChange)
+  onPeersChangeRef.current = onPeersChange
 
   useEffect(() => {
     const roomId = `project:${projectId}:whiteboard:${whiteboardId}`
@@ -90,7 +100,8 @@ export function useTeamWhiteboardSync({
       userId: currentUser.userId,
       displayName: currentUser.displayName,
       avatarUrl: currentUser.avatarUrl,
-      color: currentUser.color ?? '#10b981'
+      color: currentUser.color ?? '#10b981',
+      cursor: lastCursorRef.current
     })
 
     const unsubscribeBoard = crdt.subscribe((updated) => {
@@ -101,21 +112,23 @@ export function useTeamWhiteboardSync({
     })
 
     const unsubscribePresence = room.onPresenceChange((activePresences) => {
-      const others = activePresences
-        .filter((p) => p.userId !== currentUser.userId && p.cursor !== undefined)
-        .map((p) => ({
-          userId: p.userId,
-          displayName: p.displayName,
-          color: p.color,
-          x: p.cursor?.x ?? 0,
-          y: p.cursor?.y ?? 0,
-          lastSeen: p.lastSeen
-        }))
-      setRemoteCursors(others)
+      setPresences(activePresences)
+      if (onPeersChangeRef.current) {
+        onPeersChangeRef.current(
+          activePresences.filter((p) => p.userId !== currentUser.userId)
+        )
+      }
     })
 
     const presenceInterval = setInterval(() => {
       room.cleanStalePresences()
+      room.updatePresence({
+        userId: currentUser.userId,
+        displayName: currentUser.displayName,
+        avatarUrl: currentUser.avatarUrl,
+        color: currentUser.color ?? '#10b981',
+        cursor: lastCursorRef.current
+      })
     }, 15000)
 
     return () => {
@@ -123,6 +136,7 @@ export function useTeamWhiteboardSync({
       unsubscribeStatus()
       unsubscribeBoard()
       unsubscribePresence()
+      onPeersChangeRef.current?.([])
       room.destroy()
       crdt.destroy()
       crdtRef.current = null
@@ -138,6 +152,28 @@ export function useTeamWhiteboardSync({
     currentUser.avatarUrl,
     currentUser.color
   ])
+
+  const peers = useMemo(
+    () => presences.filter((p) => p.userId !== currentUser.userId),
+    [presences, currentUser.userId]
+  )
+
+  const remoteCursors = useMemo<WhiteboardCursorPresence[]>(() => {
+    const result: WhiteboardCursorPresence[] = []
+    for (const peer of peers) {
+      if (peer.cursor) {
+        result.push({
+          userId: peer.userId,
+          displayName: peer.displayName,
+          color: peer.color,
+          x: peer.cursor.x,
+          y: peer.cursor.y,
+          lastSeen: peer.lastSeen
+        })
+      }
+    }
+    return result
+  }, [peers])
 
   const upsertItem = useCallback((item: TeamWhiteboardItem) => {
     crdtRef.current?.upsertItem(item)
@@ -170,6 +206,7 @@ export function useTeamWhiteboardSync({
         return
       }
       lastCursorBroadcastRef.current = now
+      lastCursorRef.current = { x, y }
 
       roomProviderRef.current?.updatePresence({
         userId: currentUser.userId,
@@ -185,6 +222,8 @@ export function useTeamWhiteboardSync({
   return {
     whiteboard,
     syncStatus,
+    presences,
+    peers,
     remoteCursors,
     upsertItem,
     moveItem,
