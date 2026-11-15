@@ -3,20 +3,24 @@ import { Activity, Eye, FileText, Kanban, Loader2, Lock, PenTool, RefreshCw } fr
 import { toast } from 'sonner'
 import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
 import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
+import type { CollaboratorPresence } from '../../../../shared/teamwork/realtime/team-crdt-types'
 import {
   computeBoardSprintMetrics,
   extractActionItemsFromMarkdownToBoard
 } from './kanban/team-kanban-board-mutations'
 import { TeamActivityView } from './activity/TeamActivityView'
+import { TeamInboxPopover } from './activity/TeamInboxPopover'
 import { TeamKanbanConnectedView } from './kanban/TeamKanbanConnectedView'
 import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
 import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
+import { TeamCollaboratorsStrip } from './workspace/TeamCollaboratorsStrip'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
 import { useTeamDeepLinkJoinStore } from './hooks/team-deep-link-store'
+import { useTeamInbox } from './hooks/use-team-inbox'
 import { useTeamSyncAndAuth } from './hooks/use-team-sync-and-auth'
 import { useTeamWorkspaceData } from './hooks/use-team-workspace-data'
 import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
@@ -24,6 +28,7 @@ import { getTeamPreloadApi } from './hooks/use-team-workspace-registry-actions'
 
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
+  const [activePeers, setActivePeers] = useState<CollaboratorPresence[]>([])
   const activeWorktree = useActiveWorktree()
   const activeRepo = useActiveRepo()
   const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
@@ -88,6 +93,16 @@ export default function TeamPage(): React.JSX.Element {
     }),
     [syncAndAuth.user.userId, syncAndAuth.user.displayName, syncAndAuth.user.avatarUrl]
   )
+
+  const inbox = useTeamInbox({
+    teamId: registry.activeTeam?.id ?? 'team-local',
+    projectId: activeProjectId,
+    currentUser: {
+      userId: syncAndAuth.user.userId,
+      displayName: syncAndAuth.user.displayName,
+      email: syncAndAuth.user.email
+    }
+  })
 
   const handleInviteMember = useCallback(
     async (email: string, role: TeamRole) => {
@@ -201,7 +216,7 @@ export default function TeamPage(): React.JSX.Element {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {permissions.isReadOnly ? (
             <Badge
               variant="outline"
@@ -212,16 +227,34 @@ export default function TeamPage(): React.JSX.Element {
               Solo lectura (Viewer)
             </Badge>
           ) : null}
+          <TeamCollaboratorsStrip
+            currentUser={{ ...currentUserIdentity, color: '#3b82f6' }}
+            peers={activePeers}
+          />
           {boardMetrics && registry.currentProject && (
             <span className="text-2xs text-muted-foreground mr-1">
               {boardMetrics.completedCards}/{boardMetrics.totalCards} tareas ·{' '}
               {notes?.notes.length ?? 0} docs
             </span>
           )}
+          <TeamInboxPopover
+            items={inbox.items}
+            unreadCount={inbox.unreadCount}
+            loading={inbox.loading}
+            onMarkAsRead={inbox.markAsRead}
+            onMarkAllAsRead={inbox.markAllAsRead}
+            onSelectTab={(tab) => setActiveTab(tab)}
+            onRefresh={() => {
+              void inbox.refresh()
+            }}
+          />
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={refetch}
+            onClick={() => {
+              void refetch()
+              void inbox.refresh()
+            }}
             disabled={loading}
             title="Recargar datos del proyecto"
           >
@@ -256,6 +289,7 @@ export default function TeamPage(): React.JSX.Element {
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleBoardChange}
+            onPeersChange={setActivePeers}
           />
         ) : activeTab === 'whiteboard' && whiteboard ? (
           <TeamWhiteboardConnectedView
@@ -269,6 +303,7 @@ export default function TeamPage(): React.JSX.Element {
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleWhiteboardChange}
+            onPeersChange={setActivePeers}
           />
         ) : activeTab === 'notes' && notes ? (
           <TeamNotesConnectedView
@@ -281,6 +316,7 @@ export default function TeamPage(): React.JSX.Element {
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleNotesChange}
+            onPeersChange={setActivePeers}
             onExtractTasksToKanban={handleExtractTasksToKanban}
           />
         ) : activeTab === 'activity' ? (

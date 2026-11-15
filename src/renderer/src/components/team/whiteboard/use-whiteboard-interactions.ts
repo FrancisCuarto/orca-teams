@@ -192,6 +192,8 @@ export function useWhiteboardInteractions(opts: Options) {
   const onCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const worldPt = toWorld(e.clientX, e.clientY)
+      setCursorCoords(worldPt)
+      onCursorMove?.(worldPt.x, worldPt.y)
       if (e.button === 1 || isSpaceHeld || activeTool === 'pan') {
         setIsPanning(true)
         sessionRef.current = {

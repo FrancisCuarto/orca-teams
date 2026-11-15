@@ -14,6 +14,7 @@ import {
   type TeamPermissions
 } from '../../../../../shared/teamwork/team-rbac-policy'
 import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
 import { useTeamFactory } from '../hooks/use-team-factory'
@@ -41,6 +42,8 @@ type Props = {
   humanMembers?: ExtendedTeamMember[]
   onAddCardComment?: (comment: TeamCardComment) => void
   onDeleteCardComment?: (commentId: string) => void
+  peers?: CollaboratorPresence[]
+  onActiveCardChange?: (cardId?: string) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
 
@@ -55,6 +58,8 @@ export function TeamKanbanBoardView({
   humanMembers,
   onAddCardComment,
   onDeleteCardComment,
+  peers,
+  onActiveCardChange,
   onChange
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
@@ -91,7 +96,13 @@ export function TeamKanbanBoardView({
   const metrics = useMemo(() => computeBoardSprintMetrics(board), [board])
   const filters = useKanbanBoardFilters(board.columns, cardMap)
 
-  const resolvedProjectId = projectId ?? board.projectId ?? 'proj-default'
+  const handleOpenExecutionModal = useCallback(
+    (cardId: string | null) => {
+      setExecutionModalCardId(cardId)
+      onActiveCardChange?.(cardId ?? undefined)
+    },
+    [onActiveCardChange]
+  )
 
   const actions = useKanbanBoardActions({
     board,
@@ -104,7 +115,7 @@ export function TeamKanbanBoardView({
     executionsByCard,
     startCardExecution,
     hydrateLatestForCard,
-    onOpenExecutionModal: setExecutionModalCardId,
+    onOpenExecutionModal: handleOpenExecutionModal,
     onCrdtAddComment: onAddCardComment,
     onCrdtDeleteComment: onDeleteCardComment,
     onChange
@@ -195,6 +206,24 @@ export function TeamKanbanBoardView({
     [factory]
   )
 
+  const peersByCardId = useMemo(() => {
+    const map = new Map<string, CollaboratorPresence[]>()
+    if (!peers) {
+      return map
+    }
+    for (const peer of peers) {
+      if (peer.activeCardId) {
+        const list = map.get(peer.activeCardId)
+        if (list) {
+          list.push(peer)
+        } else {
+          map.set(peer.activeCardId, [peer])
+        }
+      }
+    }
+    return map
+  }, [peers])
+
   const activeCard = dnd.activeCardId ? (cardMap[dnd.activeCardId] ?? null) : null
   const activeEditingCard = editingCard ? (cardMap[editingCard.id] ?? editingCard) : null
   const executionModalCard = executionModalCardId ? (cardMap[executionModalCardId] ?? null) : null
@@ -214,15 +243,20 @@ export function TeamKanbanBoardView({
       setEditingCard(null)
       setTargetColumnId(colId ?? board.columns[0]?.id)
       setIsModalOpen(true)
+      onActiveCardChange?.(undefined)
     },
-    [board.columns, canEditBoard]
+    [board.columns, canEditBoard, onActiveCardChange]
   )
 
-  const handleEditCard = useCallback((card: TeamKanbanCard) => {
-    setEditingCard(card)
-    setTargetColumnId(card.columnId)
-    setIsModalOpen(true)
-  }, [])
+  const handleEditCard = useCallback(
+    (card: TeamKanbanCard) => {
+      setEditingCard(card)
+      setTargetColumnId(card.columnId)
+      setIsModalOpen(true)
+      onActiveCardChange?.(card.id)
+    },
+    [onActiveCardChange]
+  )
 
   const handleAddColumn = useCallback(
     (title: string): void => {
@@ -265,9 +299,18 @@ export function TeamKanbanBoardView({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
-        onDragStart={dnd.handleDragStart}
+        onDragStart={(event) => {
+          dnd.handleDragStart(event)
+          if (typeof event.active.id === 'string' && cardMap[event.active.id]) {
+            onActiveCardChange?.(event.active.id)
+          }
+        }}
         onDragOver={dnd.handleDragOver}
-        onDragEnd={dnd.handleDragEnd}
+        onDragEnd={(event) => {
+          dnd.handleDragEnd(event)
+          onActiveCardChange?.(undefined)
+        }}
+        onDragCancel={() => onActiveCardChange?.(undefined)}
       >
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <TeamKanbanColumnsViewport
@@ -277,6 +320,7 @@ export function TeamKanbanBoardView({
             factoryRunsByCard={factory.factoryRunsByCard}
             isReadOnly={isReadOnly}
             canDispatchAgents={canDispatchAgents}
+            peersByCardId={peersByCardId}
             onAddCard={handleOpenNewCard}
             onDeleteColumn={actions.handleDeleteColumn}
             onEditCard={handleEditCard}
@@ -318,7 +362,10 @@ export function TeamKanbanBoardView({
         availableMembers={board.customMembers}
         readOnly={isReadOnly}
         canDispatchAgents={canDispatchAgents}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          onActiveCardChange?.(undefined)
+        }}
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
         onDispatchAgent={actions.handleDispatchAgent}
@@ -336,7 +383,7 @@ export function TeamKanbanBoardView({
         canDispatchAgents={canDispatchAgents}
         onOpenChange={(open) => {
           if (!open) {
-            setExecutionModalCardId(null)
+            handleOpenExecutionModal(null)
           }
         }}
         onCancel={(executionId) => {

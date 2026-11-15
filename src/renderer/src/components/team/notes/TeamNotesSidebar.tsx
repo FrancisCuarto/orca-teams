@@ -3,10 +3,12 @@ import { BookOpen, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getIntlLocale } from '@/i18n/i18n'
 import type { TeamNote, TeamNoteCategory } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { NOTE_CATEGORY_META } from './team-note-templates'
 
 type Props = {
   notes: TeamNote[]
+  peers?: CollaboratorPresence[]
   activeNoteId: string | null
   searchQuery: string
   selectedCategory: string
@@ -19,6 +21,7 @@ type Props = {
 
 export function TeamNotesSidebar({
   notes,
+  peers,
   activeNoteId,
   searchQuery,
   selectedCategory,
@@ -104,6 +107,7 @@ export function TeamNotesSidebar({
           notes.map((note) => {
             const isSelected = activeNoteId === note.id
             const catMeta = NOTE_CATEGORY_META[note.category] ?? NOTE_CATEGORY_META.general
+            const notePeers = (peers ?? []).filter((p) => p.activeNoteId === note.id)
 
             return (
               <div
@@ -128,11 +132,30 @@ export function TeamNotesSidebar({
                   >
                     {catMeta.label}
                   </span>
-                  {note.status && (
-                    <span className="text-3xs uppercase px-1 rounded bg-muted text-muted-foreground font-mono">
-                      {note.status}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {notePeers.length > 0 ? (
+                      <div
+                        data-testid={`note-sidebar-editors-${note.id}`}
+                        className="flex items-center -space-x-1"
+                        title={`${notePeers.map((p) => p.displayName).join(', ')} editando`}
+                      >
+                        {notePeers.slice(0, 3).map((peer) => (
+                          <span
+                            key={peer.userId}
+                            className="inline-flex items-center justify-center size-4 rounded-full border border-background text-[8px] font-bold text-white"
+                            style={{ backgroundColor: peer.color }}
+                          >
+                            {peer.displayName.slice(0, 1).toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {note.status && (
+                      <span className="text-3xs uppercase px-1 rounded bg-muted text-muted-foreground font-mono">
+                        {note.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <h4 className="text-xs font-medium text-foreground truncate">{note.title}</h4>
                 <div className="flex items-center justify-between text-3xs text-muted-foreground mt-1.5">

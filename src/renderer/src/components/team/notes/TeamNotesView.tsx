@@ -6,6 +6,7 @@ import type {
   TeamNoteCategory,
   TeamNotesCollection
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { copyTextToClipboard } from '../utils/team-clipboard'
 import { getTeamNoteTemplate } from './team-note-templates'
 import { TeamNotesSidebar } from './TeamNotesSidebar'
@@ -13,6 +14,7 @@ import { TeamNoteEditor } from './TeamNoteEditor'
 
 type Props = {
   notesCollection: TeamNotesCollection
+  peers?: CollaboratorPresence[]
   activeNoteId?: string | null
   readOnly?: boolean
   canExtractToKanban?: boolean
@@ -23,6 +25,7 @@ type Props = {
 
 export function TeamNotesView({
   notesCollection,
+  peers,
   activeNoteId: controlledNoteId,
   readOnly = false,
   canExtractToKanban = true,
@@ -53,6 +56,13 @@ export function TeamNotesView({
       notesCollection.notes.find((n) => n.id === selectedNoteId) ?? notesCollection.notes[0] ?? null
     )
   }, [notesCollection.notes, selectedNoteId])
+
+  const activeNotePeers = useMemo(() => {
+    if (!activeNote || !peers) {
+      return []
+    }
+    return peers.filter((p) => p.activeNoteId === activeNote.id)
+  }, [activeNote, peers])
 
   const filteredNotes = useMemo(() => {
     const q = searchQuery.toLowerCase()
@@ -93,6 +103,9 @@ export function TeamNotesView({
   const handleUpdateActiveNote = (updates: Partial<TeamNote>) => {
     if (readOnly || !activeNote) {
       return
+    }
+    if (selectedNoteId !== activeNote.id) {
+      handleSelectNote(activeNote.id)
     }
     onChange({
       ...notesCollection,
@@ -190,6 +203,7 @@ export function TeamNotesView({
     <div className="flex flex-1 w-full h-full min-h-0 overflow-hidden bg-background">
       <TeamNotesSidebar
         notes={filteredNotes}
+        peers={peers}
         activeNoteId={activeNote?.id ?? null}
         searchQuery={searchQuery}
         selectedCategory={selectedCategory}
@@ -203,11 +217,13 @@ export function TeamNotesView({
       {activeNote ? (
         <TeamNoteEditor
           note={activeNote}
+          activeEditors={activeNotePeers}
           viewMode={viewMode}
           newTagInput={newTagInput}
           hasExtractableTasks={hasExtractableTasks}
           readOnly={readOnly}
           canExtractToKanban={canExtractToKanban && !readOnly}
+          onEditorFocus={() => handleSelectNote(activeNote.id)}
           onViewModeChange={setViewMode}
           onNewTagInputChange={setNewTagInput}
           onUpdateNote={handleUpdateActiveNote}

@@ -5,6 +5,7 @@ import {
   type TeamPermissions
 } from '../../../../../shared/teamwork/team-rbac-policy'
 import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useTeamNotesSync } from '../hooks/use-team-notes-sync'
 import { TeamNotesView } from './TeamNotesView'
 
@@ -22,6 +23,7 @@ type Props = {
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (notes: TeamNotesCollection) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
   onExtractTasksToKanban?: (noteTitle: string, content: string) => void
 }
 
@@ -34,21 +36,25 @@ export function TeamNotesConnectedView({
   relayUrl,
   syncToken,
   onPersist,
+  onPeersChange,
   onExtractTasksToKanban
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
-  const { notesCollection, activeNoteId, setActiveNoteId, syncNotesCollection } = useTeamNotesSync({
-    projectId,
-    currentUser,
-    relayUrl,
-    syncToken,
-    initialNotes,
-    onPersist: resolvedPermissions.canEditNotes ? onPersist : undefined
-  })
+  const { notesCollection, peers, activeNoteId, setActiveNoteId, syncNotesCollection } =
+    useTeamNotesSync({
+      projectId,
+      currentUser,
+      relayUrl,
+      syncToken,
+      initialNotes,
+      onPersist: resolvedPermissions.canEditNotes ? onPersist : undefined,
+      onPeersChange
+    })
 
   return (
     <TeamNotesView
       notesCollection={notesCollection ?? initialNotes}
+      peers={peers}
       activeNoteId={activeNoteId}
       readOnly={!resolvedPermissions.canEditNotes}
       canExtractToKanban={resolvedPermissions.canEditBoard}

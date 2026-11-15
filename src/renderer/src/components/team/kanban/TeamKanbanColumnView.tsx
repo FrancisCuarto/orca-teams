@@ -7,6 +7,7 @@ import type {
   TeamKanbanCard,
   TeamKanbanColumn
 } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import type { AgentExecutionStatus } from '../../../../../shared/teamwork/team-workspace-types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ type Props = {
   canDispatchAgents?: boolean
   cardExecutions?: Record<string, AgentExecutionStatus>
   factoryRunsByCard?: Map<string, FactoryRunRecord>
+  peersByCardId?: Map<string, CollaboratorPresence[]>
   onAddCard: (columnId: string) => void
   onDeleteColumn?: (columnId: string) => void
   onEditCard: (card: TeamKanbanCard) => void
@@ -44,6 +46,7 @@ export function TeamKanbanColumnView({
   canDispatchAgents = true,
   cardExecutions,
   factoryRunsByCard,
+  peersByCardId,
   onAddCard,
   onDeleteColumn,
   onEditCard,
@@ -253,6 +256,7 @@ export function TeamKanbanColumnView({
               columns={columns}
               isReadOnly={isReadOnly}
               canDispatchAgents={canDispatchAgents}
+              activePeers={peersByCardId?.get(card.id)}
               executionStatus={cardExecutions?.[card.id]}
               factoryRun={factoryRunsByCard?.get(card.id)}
               onViewExecution={onViewExecution}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-keyboard-event'
 import type { TeamNote } from '../../../../../shared/teamwork/team-kanban-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import {
   isTeamNoteCategory,
   isTeamNoteStatus
@@ -12,11 +13,13 @@ import { TeamNotePreview } from './TeamNotePreview'
 
 type Props = {
   note: TeamNote
+  activeEditors?: CollaboratorPresence[]
   viewMode: 'edit' | 'preview'
   newTagInput: string
   hasExtractableTasks: boolean
   readOnly?: boolean
   canExtractToKanban?: boolean
+  onEditorFocus?: () => void
   onViewModeChange: (mode: 'edit' | 'preview') => void
   onNewTagInputChange: (val: string) => void
   onUpdateNote: (updates: Partial<TeamNote>) => void
@@ -31,11 +34,13 @@ type Props = {
 
 export function TeamNoteEditor({
   note,
+  activeEditors,
   viewMode,
   newTagInput,
   hasExtractableTasks,
   readOnly = false,
   canExtractToKanban = true,
+  onEditorFocus,
   onViewModeChange,
   onNewTagInputChange,
   onUpdateNote,
@@ -56,6 +61,7 @@ export function TeamNoteEditor({
             value={note.title}
             readOnly={readOnly}
             disabled={readOnly}
+            onFocus={onEditorFocus}
             onChange={(e) => {
               if (!readOnly) {
                 onUpdateNote({ title: e.target.value })
@@ -173,41 +179,66 @@ export function TeamNoteEditor({
         </div>
       </div>
 
-      {/* Tags Ribbon */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/50 bg-muted/20 text-xs overflow-x-auto">
-        <Tag className="size-3 text-muted-foreground shrink-0" />
-        {note.tags.map((tag) => (
-          <span
-            key={tag}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-3xs font-medium border border-border"
+      {/* Tags Ribbon & Live Active Editors */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-border/50 bg-muted/20 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <Tag className="size-3 text-muted-foreground shrink-0" />
+          {note.tags.map((tag) => (
+            <span
+              key={tag}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-3xs font-medium border border-border"
+            >
+              {tag}
+              {!readOnly ? (
+                <button
+                  type="button"
+                  onClick={() => onRemoveTag(tag)}
+                  className="text-muted-foreground hover:text-foreground ml-0.5"
+                >
+                  ×
+                </button>
+              ) : null}
+            </span>
+          ))}
+          {!readOnly ? (
+            <div className="flex items-center gap-1 ml-1">
+              <input
+                type="text"
+                value={newTagInput}
+                onChange={(e) => onNewTagInputChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
+                    e.preventDefault()
+                    onAddTag()
+                  }
+                }}
+                placeholder="+ tag..."
+                className="bg-transparent text-3xs text-foreground focus:outline-hidden w-16"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {activeEditors && activeEditors.length > 0 ? (
+          <div
+            data-testid="note-active-editors"
+            className="flex items-center gap-1.5 shrink-0"
           >
-            {tag}
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={() => onRemoveTag(tag)}
-                className="text-muted-foreground hover:text-foreground ml-0.5"
+            {activeEditors.map((peer) => (
+              <span
+                key={peer.userId}
+                data-testid={`note-active-editor-${peer.userId}`}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/90 px-2 py-0.5 text-3xs font-medium text-foreground shadow-xs"
+                style={{ borderColor: peer.color }}
+                title={`${peer.displayName} está editando esta nota`}
               >
-                ×
-              </button>
-            ) : null}
-          </span>
-        ))}
-        {!readOnly ? (
-          <div className="flex items-center gap-1 ml-1">
-            <input
-              type="text"
-              value={newTagInput}
-              onChange={(e) => onNewTagInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
-                  e.preventDefault()
-                  onAddTag()
-                }
-              }}
-              placeholder="+ tag..."
-              className="bg-transparent text-3xs text-foreground focus:outline-hidden w-16"
-            />
+                <span
+                  className="size-1.5 rounded-full animate-pulse shrink-0"
+                  style={{ backgroundColor: peer.color }}
+                />
+                <span>{peer.displayName} editando</span>
+              </span>
+            ))}
           </div>
         ) : null}
       </div>
@@ -218,6 +249,7 @@ export function TeamNoteEditor({
           <textarea
             value={note.content}
             readOnly={readOnly}
+            onFocus={onEditorFocus}
             onChange={(e) => {
               if (!readOnly) {
                 onUpdateNote({ content: e.target.value })

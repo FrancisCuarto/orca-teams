@@ -8,6 +8,7 @@ import {
   type TeamPermissions
 } from '../../../../../shared/teamwork/team-rbac-policy'
 import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
+import type { CollaboratorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useTeamKanbanSync } from '../hooks/use-team-kanban-sync'
 import { TeamBoardPresenceBar } from './TeamBoardPresenceBar'
 import { TeamKanbanBoardView } from './TeamKanbanBoardView'
@@ -28,6 +29,7 @@ type Props = {
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (updatedBoard: TeamKanbanBoard) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
 
 export function TeamKanbanConnectedView({
@@ -40,19 +42,29 @@ export function TeamKanbanConnectedView({
   humanMembers,
   relayUrl,
   syncToken,
-  onPersist
+  onPersist,
+  onPeersChange
 }: Props): React.JSX.Element {
   const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
-  const { board, presences, syncStatus, syncBoard, addCardComment, deleteCardComment } =
-    useTeamKanbanSync({
-      boardId: initialBoard.id,
-      projectId,
-      currentUser,
-      relayUrl,
-      syncToken,
-      initialBoard,
-      onPersist: resolvedPermissions.canEditBoard ? onPersist : undefined
-    })
+  const {
+    board,
+    presences,
+    peers,
+    syncStatus,
+    syncBoard,
+    updateActiveCard,
+    addCardComment,
+    deleteCardComment
+  } = useTeamKanbanSync({
+    boardId: initialBoard.id,
+    projectId,
+    currentUser,
+    relayUrl,
+    syncToken,
+    initialBoard,
+    onPersist: resolvedPermissions.canEditBoard ? onPersist : undefined,
+    onPeersChange
+  })
 
   const activeBoard = board ?? initialBoard
   const activeCardsCount = useMemo(() => {
@@ -81,6 +93,8 @@ export function TeamKanbanConnectedView({
         userRole={userRole}
         permissions={resolvedPermissions}
         humanMembers={humanMembers}
+        peers={peers}
+        onActiveCardChange={updateActiveCard}
         onAddCardComment={addCardComment}
         onDeleteCardComment={deleteCardComment}
         onChange={(updatedBoard) => {

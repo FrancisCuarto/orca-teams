@@ -4,7 +4,10 @@ import type {
   TeamWhiteboardItem,
   WhiteboardShapeKind
 } from '../../../../../shared/teamwork/team-kanban-types'
-import type { WhiteboardCursorPresence } from '../../../../../shared/teamwork/realtime/team-crdt-types'
+import type {
+  CollaboratorPresence,
+  WhiteboardCursorPresence
+} from '../../../../../shared/teamwork/realtime/team-crdt-types'
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import { TeamWhiteboardToolbar } from './TeamWhiteboardToolbar'
 import { TeamWhiteboardCardItem } from './TeamWhiteboardCardItem'
@@ -19,6 +22,7 @@ import { getItemBounds, getMaxZIndex, isBoxItem, type WhiteboardTool } from './w
 
 type Props = {
   whiteboard: TeamWhiteboard
+  peers?: CollaboratorPresence[]
   remoteCursors?: WhiteboardCursorPresence[]
   readOnly?: boolean
   canCreateTask?: boolean
@@ -28,11 +32,13 @@ type Props = {
 }
 
 const EMPTY_CURSORS: WhiteboardCursorPresence[] = []
+const EMPTY_PEERS: CollaboratorPresence[] = []
 const DOT_GRID_BG =
   'radial-gradient(circle, var(--color-border, rgba(255,255,255,0.1)) 1px, transparent 1px)'
 
 export function TeamWhiteboardView({
   whiteboard,
+  peers = EMPTY_PEERS,
   remoteCursors = EMPTY_CURSORS,
   readOnly = false,
   canCreateTask = true,
@@ -310,6 +316,30 @@ export function TeamWhiteboardView({
         <span>{whiteboard.items.length} elem.</span>
         <span>{Math.round(zoom * 100)}%</span>
       </div>
+
+      {peers.length > 0 ? (
+        <div
+          data-testid="whiteboard-live-peers"
+          className="absolute bottom-3 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/90 backdrop-blur-xs border border-border text-3xs text-foreground shadow-xs"
+        >
+          {peers.slice(0, 4).map((peer) => (
+            <span
+              key={peer.userId}
+              className="inline-flex items-center gap-1 rounded-full bg-secondary/80 px-1.5 py-0.5 border border-border"
+              style={{ borderColor: peer.color }}
+            >
+              <span
+                className="size-1.5 rounded-full animate-pulse shrink-0"
+                style={{ backgroundColor: peer.color }}
+              />
+              <span className="truncate max-w-[90px]">{peer.displayName}</span>
+            </span>
+          ))}
+          {peers.length > 4 ? (
+            <span className="text-muted-foreground">+{peers.length - 4}</span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

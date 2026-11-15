@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type {
   TeamCardComment,
   TeamKanbanBoard,
@@ -24,11 +24,13 @@ export type UseTeamKanbanSyncOptions = {
   syncToken?: string
   initialBoard?: TeamKanbanBoard | null
   onPersist?: (board: TeamKanbanBoard) => void
+  onPeersChange?: (peers: CollaboratorPresence[]) => void
 }
 
 export type UseTeamKanbanSyncReturn = {
   board: TeamKanbanBoard | null
   presences: CollaboratorPresence[]
+  peers: CollaboratorPresence[]
   syncStatus: SyncStatus
   upsertCard: (card: TeamKanbanCard) => void
   moveCard: (cardId: string, targetColId: string, newPosition?: number) => void
@@ -46,7 +48,8 @@ export function useTeamKanbanSync({
   relayUrl,
   syncToken,
   initialBoard,
-  onPersist
+  onPersist,
+  onPeersChange
 }: UseTeamKanbanSyncOptions): UseTeamKanbanSyncReturn {
   const [board, setBoard] = useState<TeamKanbanBoard | null>(initialBoard ?? null)
   const [presences, setPresences] = useState<CollaboratorPresence[]>([])
@@ -54,10 +57,13 @@ export function useTeamKanbanSync({
 
   const crdtRef = useRef<TeamBoardCRDT | null>(null)
   const roomProviderRef = useRef<TeamRoomProvider | null>(null)
+  const activeCardIdRef = useRef<string | undefined>(undefined)
   const initialBoardRef = useRef(initialBoard)
   initialBoardRef.current = initialBoard
   const onPersistRef = useRef(onPersist)
   onPersistRef.current = onPersist
+  const onPeersChangeRef = useRef(onPeersChange)
+  onPeersChangeRef.current = onPeersChange
 
   useEffect(() => {
     const roomId = `project:${projectId}:board:${boardId}`
@@ -89,7 +95,8 @@ export function useTeamKanbanSync({
       userId: currentUser.userId,
       displayName: currentUser.displayName,
       avatarUrl: currentUser.avatarUrl,
-      color: currentUser.color ?? '#3b82f6'
+      color: currentUser.color ?? '#3b82f6',
+      activeCardId: activeCardIdRef.current
     })
 
     const unsubscribeBoard = crdt.subscribe((updatedBoard) => {
@@ -101,10 +108,22 @@ export function useTeamKanbanSync({
 
     const unsubscribePresence = room.onPresenceChange((activePresences) => {
       setPresences(activePresences)
+      if (onPeersChangeRef.current) {
+        onPeersChangeRef.current(
+          activePresences.filter((p) => p.userId !== currentUser.userId)
+        )
+      }
     })
 
     const presenceInterval = setInterval(() => {
       room.cleanStalePresences()
+      room.updatePresence({
+        userId: currentUser.userId,
+        displayName: currentUser.displayName,
+        avatarUrl: currentUser.avatarUrl,
+        color: currentUser.color ?? '#3b82f6',
+        activeCardId: activeCardIdRef.current
+      })
     }, 15000)
 
     return () => {
@@ -112,6 +131,7 @@ export function useTeamKanbanSync({
       unsubscribeStatus()
       unsubscribeBoard()
       unsubscribePresence()
+      onPeersChangeRef.current?.([])
       room.destroy()
       crdt.destroy()
       crdtRef.current = null
@@ -127,6 +147,11 @@ export function useTeamKanbanSync({
     currentUser.avatarUrl,
     currentUser.color
   ])
+
+  const peers = useMemo(
+    () => presences.filter((p) => p.userId !== currentUser.userId),
+    [presences, currentUser.userId]
+  )
 
   const upsertCard = useCallback((card: TeamKanbanCard) => {
     crdtRef.current?.upsertCard(card)
@@ -154,6 +179,7 @@ export function useTeamKanbanSync({
 
   const updateActiveCard = useCallback(
     (cardId?: string) => {
+      activeCardIdRef.current = cardId
       roomProviderRef.current?.updatePresence({
         userId: currentUser.userId,
         displayName: currentUser.displayName,
@@ -168,6 +194,7 @@ export function useTeamKanbanSync({
   return {
     board,
     presences,
+    peers,
     syncStatus,
     upsertCard,
     moveCard,
