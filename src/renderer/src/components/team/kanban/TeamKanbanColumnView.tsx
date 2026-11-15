@@ -19,6 +19,8 @@ type Props = {
   cards: TeamKanbanCard[]
   columns?: TeamKanbanColumn[]
   canDelete?: boolean
+  isReadOnly?: boolean
+  canDispatchAgents?: boolean
   cardExecutions?: Record<string, AgentExecutionStatus>
   factoryRunsByCard?: Map<string, FactoryRunRecord>
   onAddCard: (columnId: string) => void
@@ -38,6 +40,8 @@ export function TeamKanbanColumnView({
   cards,
   columns,
   canDelete = false,
+  isReadOnly = false,
+  canDispatchAgents = true,
   cardExecutions,
   factoryRunsByCard,
   onAddCard,
@@ -107,9 +111,18 @@ export function TeamKanbanColumnView({
           {hasWipLimit ? (
             <button
               type="button"
-              onClick={() => setIsEditingWip((prev) => !prev)}
-              className="inline-flex items-center cursor-pointer"
-              title={`Límite WIP: ${cards.length}/${column.wipLimit}. Clic para editar`}
+              disabled={isReadOnly}
+              onClick={() => {
+                if (!isReadOnly) {
+                  setIsEditingWip((prev) => !prev)
+                }
+              }}
+              className={`inline-flex items-center ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
+              title={
+                isReadOnly
+                  ? `Límite WIP: ${cards.length}/${column.wipLimit}`
+                  : `Límite WIP: ${cards.length}/${column.wipLimit}. Clic para editar`
+              }
             >
               <Badge
                 variant={isOverWip ? 'destructive' : 'outline'}
@@ -126,9 +139,20 @@ export function TeamKanbanColumnView({
           ) : (
             <button
               type="button"
-              onClick={() => setIsEditingWip((prev) => !prev)}
-              className="text-2xs font-medium text-muted-foreground bg-muted/60 hover:bg-muted px-1.5 py-0.2 rounded-full cursor-pointer transition-colors"
-              title="Cantidad de tareas. Clic para configurar límite WIP"
+              disabled={isReadOnly}
+              onClick={() => {
+                if (!isReadOnly) {
+                  setIsEditingWip((prev) => !prev)
+                }
+              }}
+              className={`text-2xs font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.2 rounded-full transition-colors ${
+                isReadOnly ? 'cursor-default' : 'hover:bg-muted cursor-pointer'
+              }`}
+              title={
+                isReadOnly
+                  ? `${cards.length} tareas`
+                  : 'Cantidad de tareas. Clic para configurar límite WIP'
+              }
             >
               {cards.length}
             </button>
@@ -145,40 +169,42 @@ export function TeamKanbanColumnView({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => setIsEditingWip((prev) => !prev)}
-            title="Configurar límite WIP"
-          >
-            <Gauge className="size-3 text-muted-foreground" />
-          </Button>
-
-          {canDelete && cards.length === 0 && onDeleteColumn ? (
+        {!isReadOnly ? (
+          <div className="flex items-center gap-0.5 shrink-0">
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={() => onDeleteColumn(column.id)}
-              title="Eliminar columna vacía"
+              onClick={() => setIsEditingWip((prev) => !prev)}
+              title="Configurar límite WIP"
             >
-              <Trash2 className="size-3 text-muted-foreground hover:text-destructive" />
+              <Gauge className="size-3 text-muted-foreground" />
             </Button>
-          ) : null}
 
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => onAddCard(column.id)}
-            title="Añadir tarjeta a esta columna"
-          >
-            <Plus className="size-3.5" />
-          </Button>
-        </div>
+            {canDelete && cards.length === 0 && onDeleteColumn ? (
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                onClick={() => onDeleteColumn(column.id)}
+                title="Eliminar columna vacía"
+              >
+                <Trash2 className="size-3 text-muted-foreground hover:text-destructive" />
+              </Button>
+            ) : null}
+
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={() => onAddCard(column.id)}
+              title="Añadir tarjeta a esta columna"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Inline WIP Limit Editor */}
-      {isEditingWip ? (
+      {isEditingWip && !isReadOnly ? (
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-secondary/40 text-xs">
           <span className="text-3xs text-muted-foreground shrink-0">Límite WIP:</span>
           <Input
@@ -225,6 +251,8 @@ export function TeamKanbanColumnView({
               key={card.id}
               card={card}
               columns={columns}
+              isReadOnly={isReadOnly}
+              canDispatchAgents={canDispatchAgents}
               executionStatus={cardExecutions?.[card.id]}
               factoryRun={factoryRunsByCard?.get(card.id)}
               onViewExecution={onViewExecution}
@@ -241,14 +269,16 @@ export function TeamKanbanColumnView({
         {cards.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground/60">
             <p className="text-xs">Sin tareas</p>
-            <Button
-              variant="link"
-              size="xs"
-              onClick={() => onAddCard(column.id)}
-              className="mt-1 text-xs"
-            >
-              + Crear primera
-            </Button>
+            {!isReadOnly ? (
+              <Button
+                variant="link"
+                size="xs"
+                onClick={() => onAddCard(column.id)}
+                className="mt-1 text-xs"
+              >
+                + Crear primera
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>

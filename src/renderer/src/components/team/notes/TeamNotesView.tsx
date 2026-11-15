@@ -14,6 +14,8 @@ import { TeamNoteEditor } from './TeamNoteEditor'
 type Props = {
   notesCollection: TeamNotesCollection
   activeNoteId?: string | null
+  readOnly?: boolean
+  canExtractToKanban?: boolean
   onSelectNoteId?: (id: string | null) => void
   onChange: (updated: TeamNotesCollection) => void
   onExtractTasksToKanban?: (noteTitle: string, content: string) => void
@@ -22,6 +24,8 @@ type Props = {
 export function TeamNotesView({
   notesCollection,
   activeNoteId: controlledNoteId,
+  readOnly = false,
+  canExtractToKanban = true,
   onSelectNoteId,
   onChange,
   onExtractTasksToKanban
@@ -65,6 +69,9 @@ export function TeamNotesView({
   }, [notesCollection.notes, searchQuery, selectedCategory])
 
   const handleCreateNote = (category: TeamNoteCategory = 'general') => {
+    if (readOnly) {
+      return
+    }
     const now = Date.now()
     const { title, content } = getTeamNoteTemplate(category)
     const newNote: TeamNote = {
@@ -84,7 +91,7 @@ export function TeamNotesView({
   }
 
   const handleUpdateActiveNote = (updates: Partial<TeamNote>) => {
-    if (!activeNote) {
+    if (readOnly || !activeNote) {
       return
     }
     onChange({
@@ -97,6 +104,9 @@ export function TeamNotesView({
   }
 
   const handleDeleteNote = (id: string) => {
+    if (readOnly) {
+      return
+    }
     const updated = notesCollection.notes.filter((n) => n.id !== id)
     onChange({ ...notesCollection, notes: updated, updatedAt: Date.now() })
     if (selectedNoteId === id) {
@@ -138,7 +148,7 @@ export function TeamNotesView({
   }
 
   const handleAddTag = () => {
-    if (!newTagInput.trim() || !activeNote) {
+    if (readOnly || !newTagInput.trim() || !activeNote) {
       return
     }
     const trimmed = newTagInput.trim()
@@ -149,7 +159,7 @@ export function TeamNotesView({
   }
 
   const handleRemoveTag = (tagToRemove: string) => {
-    if (!activeNote) {
+    if (readOnly || !activeNote) {
       return
     }
     handleUpdateActiveNote({
@@ -158,7 +168,7 @@ export function TeamNotesView({
   }
 
   const handleToggleChecklistLine = (lineIndex: number) => {
-    if (!activeNote) {
+    if (readOnly || !activeNote) {
       return
     }
     const lines = activeNote.content.split('\n')
@@ -183,6 +193,7 @@ export function TeamNotesView({
         activeNoteId={activeNote?.id ?? null}
         searchQuery={searchQuery}
         selectedCategory={selectedCategory}
+        readOnly={readOnly}
         onSearchChange={setSearchQuery}
         onSelectCategory={setSelectedCategory}
         onSelectNote={handleSelectNote}
@@ -195,6 +206,8 @@ export function TeamNotesView({
           viewMode={viewMode}
           newTagInput={newTagInput}
           hasExtractableTasks={hasExtractableTasks}
+          readOnly={readOnly}
+          canExtractToKanban={canExtractToKanban && !readOnly}
           onViewModeChange={setViewMode}
           onNewTagInputChange={setNewTagInput}
           onUpdateNote={handleUpdateActiveNote}
@@ -209,7 +222,7 @@ export function TeamNotesView({
             void handleSendToAgentContext()
           }}
           onExtractTasksToKanban={
-            onExtractTasksToKanban
+            onExtractTasksToKanban && canExtractToKanban && !readOnly
               ? () => onExtractTasksToKanban(activeNote.title, activeNote.content)
               : undefined
           }

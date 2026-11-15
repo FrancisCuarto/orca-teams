@@ -12,27 +12,34 @@ import {
 
 export function useKanbanDragHandlers(options: {
   board: TeamKanbanBoard
+  disabled?: boolean
   onAssignDraggedMember: (cardId: string, dragged: TeamKanbanAssignee) => void
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }) {
-  const { board, onAssignDraggedMember, onChange } = options
+  const { board, disabled = false, onAssignDraggedMember, onChange } = options
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
   const [activeAssignee, setActiveAssignee] = useState<TeamKanbanAssignee | null>(null)
 
-  const handleDragStart = useCallback((event: DragStartEvent): void => {
-    const data = event.active.data.current
-    if (isDraggableAssigneeData(data)) {
-      setActiveAssignee(data.assignee)
-      setActiveCardId(null)
-    } else {
-      setActiveCardId(String(event.active.id))
-      setActiveAssignee(null)
-    }
-  }, [])
+  const handleDragStart = useCallback(
+    (event: DragStartEvent): void => {
+      if (disabled) {
+        return
+      }
+      const data = event.active.data.current
+      if (isDraggableAssigneeData(data)) {
+        setActiveAssignee(data.assignee)
+        setActiveCardId(null)
+      } else {
+        setActiveCardId(String(event.active.id))
+        setActiveAssignee(null)
+      }
+    },
+    [disabled]
+  )
 
   const handleDragOver = useCallback(
     (event: DragOverEvent): void => {
-      if (activeAssignee || !event.over) {
+      if (disabled || activeAssignee || !event.over) {
         return
       }
       const next = moveKanbanCardAcrossColumns(
@@ -44,7 +51,7 @@ export function useKanbanDragHandlers(options: {
         onChange(next)
       }
     },
-    [activeAssignee, board, onChange]
+    [activeAssignee, board, disabled, onChange]
   )
 
   const handleDragEnd = useCallback(
@@ -53,7 +60,7 @@ export function useKanbanDragHandlers(options: {
       const dragged = activeAssignee
       setActiveCardId(null)
       setActiveAssignee(null)
-      if (!over) {
+      if (disabled || !over) {
         return
       }
       const overId = String(over.id)
@@ -66,7 +73,7 @@ export function useKanbanDragHandlers(options: {
         onChange(reordered)
       }
     },
-    [activeAssignee, board, onAssignDraggedMember, onChange]
+    [activeAssignee, board, disabled, onAssignDraggedMember, onChange]
   )
 
   return {

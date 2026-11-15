@@ -14,6 +14,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 type Options = {
   selectedItemId: string | null
+  readOnly?: boolean
   onSpaceChange: (held: boolean) => void
   onSelectItem: (id: string | null) => void
   onSelectTool: (tool: WhiteboardTool) => void
@@ -26,6 +27,7 @@ type Options = {
 export function useWhiteboardShortcuts(opts: Options): void {
   const {
     selectedItemId,
+    readOnly = false,
     onSpaceChange,
     onSelectItem,
     onSelectTool,
@@ -45,8 +47,13 @@ export function useWhiteboardShortcuts(opts: Options): void {
         onSpaceChange(true)
         return
       }
+      if (e.key === 'Escape') {
+        onSelectItem(null)
+        onSelectTool('select')
+        return
+      }
       const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key.toLowerCase() === 'z') {
+      if (!readOnly && mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) {
           onRedo()
@@ -55,24 +62,19 @@ export function useWhiteboardShortcuts(opts: Options): void {
         }
         return
       }
-      if (mod && e.key.toLowerCase() === 'y') {
+      if (!readOnly && mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         onRedo()
         return
       }
-      if (mod && e.key.toLowerCase() === 'd' && selectedItemId) {
+      if (!readOnly && mod && e.key.toLowerCase() === 'd' && selectedItemId) {
         e.preventDefault()
         onDuplicateSelected()
         return
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItemId) {
+      if (!readOnly && (e.key === 'Delete' || e.key === 'Backspace') && selectedItemId) {
         e.preventDefault()
         onDeleteSelected()
-        return
-      }
-      if (e.key === 'Escape') {
-        onSelectItem(null)
-        onSelectTool('select')
         return
       }
       if (!mod) {
@@ -81,9 +83,9 @@ export function useWhiteboardShortcuts(opts: Options): void {
           onSelectTool('select')
         } else if (k === 'h') {
           onSelectTool('pan')
-        } else if (k === 'p') {
+        } else if (!readOnly && k === 'p') {
           onSelectTool('draw')
-        } else if (k === 'a') {
+        } else if (!readOnly && k === 'a') {
           onSelectTool('arrow')
         }
       }
@@ -103,6 +105,7 @@ export function useWhiteboardShortcuts(opts: Options): void {
     }
   }, [
     selectedItemId,
+    readOnly,
     onSpaceChange,
     onSelectItem,
     onSelectTool,

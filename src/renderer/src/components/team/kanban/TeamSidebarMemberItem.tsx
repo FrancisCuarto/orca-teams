@@ -16,6 +16,7 @@ type DraggableAssigneePayload = {
 type Props = {
   member: ExtendedTeamMember
   isSelected?: boolean
+  isReadOnly?: boolean
   workload?: { count: number; points: number }
   onToggleFilter?: (member: ExtendedTeamMember) => void
 }
@@ -23,6 +24,7 @@ type Props = {
 export function TeamSidebarMemberItem({
   member,
   isSelected = false,
+  isReadOnly = false,
   workload,
   onToggleFilter
 }: Props): React.JSX.Element {
@@ -33,7 +35,8 @@ export function TeamSidebarMemberItem({
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `member:${member.id}`,
-    data: draggableData
+    data: draggableData,
+    disabled: isReadOnly
   })
 
   const isAgent = member.type === 'agent'
@@ -50,16 +53,22 @@ export function TeamSidebarMemberItem({
     <div
       ref={setNodeRef}
       {...attributes}
-      {...listeners}
+      {...(isReadOnly ? {} : listeners)}
       onClick={() => onToggleFilter?.(member)}
-      className={`group relative flex flex-col gap-1 p-2 rounded-xl border transition-all cursor-grab active:cursor-grabbing ${
+      className={`group relative flex flex-col gap-1 p-2 rounded-xl border transition-all ${
+        isReadOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+      } ${
         isDragging
           ? 'opacity-40 ring-2 ring-primary border-primary'
           : isSelected
             ? 'bg-accent border-ring shadow-xs'
             : 'bg-card/70 border-border hover:bg-accent/60'
       }`}
-      title="Arrastra sobre una tarjeta para asignar, o clic para filtrar"
+      title={
+        isReadOnly
+          ? 'Clic para filtrar tareas'
+          : 'Arrastra sobre una tarjeta para asignar, o clic para filtrar'
+      }
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -92,9 +101,11 @@ export function TeamSidebarMemberItem({
             </span>
           </div>
         </div>
-        <div className="text-muted-foreground/40 group-hover:text-foreground shrink-0 cursor-grab">
-          <GripVertical className="size-3.5" />
-        </div>
+        {!isReadOnly ? (
+          <div className="text-muted-foreground/40 group-hover:text-foreground shrink-0 cursor-grab">
+            <GripVertical className="size-3.5" />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-border/40 text-3xs text-muted-foreground">

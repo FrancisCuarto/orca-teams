@@ -16,6 +16,7 @@ type Props = {
   humanMembers?: ExtendedTeamMember[]
   customMembers?: ExtendedTeamMember[]
   agentsLoading?: boolean
+  isReadOnly?: boolean
   onRefreshAgents?: () => void
   onFilterChange: (memberName: string | null) => void
   onAddCustomMember?: (member: ExtendedTeamMember) => void
@@ -31,6 +32,7 @@ export function TeamMembersSidebar({
   humanMembers,
   customMembers,
   agentsLoading = false,
+  isReadOnly = false,
   onRefreshAgents,
   onFilterChange,
   onAddCustomMember
@@ -107,7 +109,7 @@ export function TeamMembersSidebar({
           </div>
         )}
 
-        {onAddCustomMember ? (
+        {!isReadOnly && onAddCustomMember ? (
           <TeamSidebarAddMemberForm onAddCustomMember={onAddCustomMember} />
         ) : null}
       </div>
@@ -129,6 +131,7 @@ export function TeamMembersSidebar({
                     key={agent.id}
                     member={agent}
                     isSelected={selectedFilterMember === agent.name}
+                    isReadOnly={isReadOnly}
                     workload={workloadByAssignee?.[agent.name]}
                     onToggleFilter={(m) =>
                       onFilterChange(selectedFilterMember === m.name ? null : m.name)
@@ -174,6 +177,7 @@ export function TeamMembersSidebar({
                   key={human.id}
                   member={human}
                   isSelected={selectedFilterMember === human.name}
+                  isReadOnly={isReadOnly}
                   workload={workloadByAssignee?.[human.name]}
                   onToggleFilter={(m) =>
                     onFilterChange(selectedFilterMember === m.name ? null : m.name)
@@ -185,12 +189,14 @@ export function TeamMembersSidebar({
         ) : null}
       </div>
 
-      <div className="p-2 border-t border-border bg-secondary/20 text-center">
-        <p className="text-3xs text-muted-foreground leading-relaxed">
-          <strong>Drag & Drop</strong>: Arrastra un agente sobre una tarjeta para ejecutarlo al
-          instante.
-        </p>
-      </div>
+      {!isReadOnly ? (
+        <div className="p-2 border-t border-border bg-secondary/20 text-center">
+          <p className="text-3xs text-muted-foreground leading-relaxed">
+            <strong>Drag & Drop</strong>: Arrastra un agente sobre una tarjeta para ejecutarlo al
+            instante.
+          </p>
+        </div>
+      ) : null}
     </aside>
   )
 }

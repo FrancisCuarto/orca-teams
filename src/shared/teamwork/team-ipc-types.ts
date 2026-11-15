@@ -1,6 +1,7 @@
 import type {
   AgentExecutionRecord,
   Project,
+  ProjectMember,
   Team,
   TeamActivityEntry,
   TeamInvitation,
@@ -78,6 +79,7 @@ export type TeamWorkspaceSnapshot = {
   projects: Project[]
   membersByTeam: Record<string, TeamMemberWithProfile[]>
   invitationsByTeam: Record<string, TeamInvitation[]>
+  projectMembersByProject?: Record<string, ProjectMember[]>
 }
 
 export type TeamStartExecutionRequest = {

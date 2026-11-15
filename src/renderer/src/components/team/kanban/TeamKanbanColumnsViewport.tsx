@@ -16,6 +16,8 @@ type Props = {
   columnCardsMap: Map<string, TeamKanbanCard[]>
   cardStatuses: Record<string, AgentExecutionStatus>
   factoryRunsByCard?: Map<string, FactoryRunRecord>
+  isReadOnly?: boolean
+  canDispatchAgents?: boolean
   onAddCard: (columnId: string) => void
   onDeleteColumn: (columnId: string) => void
   onEditCard: (card: TeamKanbanCard) => void
@@ -34,6 +36,8 @@ export function TeamKanbanColumnsViewport({
   columnCardsMap,
   cardStatuses,
   factoryRunsByCard,
+  isReadOnly = false,
+  canDispatchAgents = true,
   onAddCard,
   onDeleteColumn,
   onEditCard,
@@ -50,7 +54,7 @@ export function TeamKanbanColumnsViewport({
   const [newColumnTitle, setNewColumnTitle] = useState('')
 
   const handleConfirmAddColumn = (): void => {
-    if (!newColumnTitle.trim()) {
+    if (isReadOnly || !newColumnTitle.trim()) {
       return
     }
     onAddColumn(newColumnTitle.trim())
@@ -66,7 +70,9 @@ export function TeamKanbanColumnsViewport({
           column={column}
           columns={columns}
           cards={columnCardsMap.get(column.id) ?? []}
-          canDelete={columns.length > 1 && column.cardIds.length === 0}
+          canDelete={!isReadOnly && columns.length > 1 && column.cardIds.length === 0}
+          isReadOnly={isReadOnly}
+          canDispatchAgents={canDispatchAgents}
           cardExecutions={cardStatuses}
           factoryRunsByCard={factoryRunsByCard}
           onAddCard={onAddCard}
@@ -82,42 +88,44 @@ export function TeamKanbanColumnsViewport({
         />
       ))}
 
-      <div className="w-[240px] shrink-0">
-        {isAddingColumn ? (
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-border bg-secondary/30">
-            <Input
-              value={newColumnTitle}
-              onChange={(e) => setNewColumnTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
-                  handleConfirmAddColumn()
-                } else if (e.key === 'Escape') {
-                  setIsAddingColumn(false)
-                }
-              }}
-              placeholder="Nombre de columna..."
-              autoFocus
-            />
-            <div className="flex items-center gap-1.5">
-              <Button size="xs" onClick={handleConfirmAddColumn} className="flex-1">
-                Añadir
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => setIsAddingColumn(false)}>
-                Cancelar
-              </Button>
+      {!isReadOnly ? (
+        <div className="w-[240px] shrink-0">
+          {isAddingColumn ? (
+            <div className="flex flex-col gap-2 p-3 rounded-xl border border-border bg-secondary/30">
+              <Input
+                value={newColumnTitle}
+                onChange={(e) => setNewColumnTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
+                    handleConfirmAddColumn()
+                  } else if (e.key === 'Escape') {
+                    setIsAddingColumn(false)
+                  }
+                }}
+                placeholder="Nombre de columna..."
+                autoFocus
+              />
+              <div className="flex items-center gap-1.5">
+                <Button size="xs" onClick={handleConfirmAddColumn} className="flex-1">
+                  Añadir
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setIsAddingColumn(false)}>
+                  Cancelar
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsAddingColumn(true)}
-            className="w-full"
-          >
-            <Plus /> Añadir Columna
-          </Button>
-        )}
-      </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddingColumn(true)}
+              className="w-full"
+            >
+              <Plus /> Añadir Columna
+            </Button>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

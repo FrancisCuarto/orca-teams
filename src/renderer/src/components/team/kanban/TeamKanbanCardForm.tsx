@@ -27,6 +27,8 @@ export type TeamKanbanCardFormProps = {
   configuredAgents?: TeamMemberEntry[]
   humanMembers?: ExtendedTeamMember[]
   availableMembers?: ExtendedTeamMember[]
+  readOnly?: boolean
+  canDispatchAgents?: boolean
   onClose: () => void
   onSave: (card: TeamKanbanCard) => void
   onDelete?: (cardId: string) => void
@@ -42,6 +44,8 @@ export function TeamKanbanCardForm({
   configuredAgents = EMPTY_AGENTS,
   humanMembers,
   availableMembers,
+  readOnly = false,
+  canDispatchAgents = true,
   onClose,
   onSave,
   onDelete,
@@ -123,6 +127,9 @@ export function TeamKanbanCardForm({
   }
 
   const handleSave = (): void => {
+    if (readOnly) {
+      return
+    }
     if (!title.trim()) {
       toast.error('El título de la tarea es obligatorio')
       return
@@ -156,20 +163,23 @@ export function TeamKanbanCardForm({
 
   return (
     <>
-      <div className="flex flex-col gap-3 py-2 max-h-[65vh] overflow-y-auto scrollbar-sleek pr-1">
+      <fieldset
+        disabled={readOnly}
+        className="flex flex-col gap-3 py-2 max-h-[65vh] overflow-y-auto scrollbar-sleek pr-1 border-0 m-0 p-0 min-w-0"
+      >
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-foreground">Título de la tarea</label>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e) && title.trim()) {
+              if (!readOnly && e.key === 'Enter' && !isImeOwnedKeyboardEvent(e) && title.trim()) {
                 e.preventDefault()
                 handleSave()
               }
             }}
             placeholder="Ej. Implementar arquitectura limpia..."
-            autoFocus
+            autoFocus={!readOnly}
           />
         </div>
 
@@ -231,11 +241,13 @@ export function TeamKanbanCardForm({
           }
           onDelete={(id) => setChecklist((prev) => prev.filter((i) => i.id !== id))}
         />
-      </div>
+      </fieldset>
 
       <TeamKanbanCardFormFooter
         card={card}
-        canSave={Boolean(title.trim())}
+        canSave={!readOnly && Boolean(title.trim())}
+        readOnly={readOnly}
+        canDispatchAgents={canDispatchAgents}
         onClose={onClose}
         onSave={handleSave}
         onDelete={onDelete}

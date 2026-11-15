@@ -1,5 +1,10 @@
 import React from 'react'
 import type { TeamWhiteboard } from '../../../../../shared/teamwork/team-kanban-types'
+import {
+  getTeamPermissions,
+  type TeamPermissions
+} from '../../../../../shared/teamwork/team-rbac-policy'
+import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
 import { useTeamWhiteboardSync } from '../hooks/use-team-whiteboard-sync'
 import { TeamWhiteboardView } from './TeamWhiteboardView'
 
@@ -13,6 +18,8 @@ type Props = {
     avatarUrl?: string
     color?: string
   }
+  userRole?: TeamRole
+  permissions?: TeamPermissions
   relayUrl?: string | null
   syncToken?: string
   onPersist?: (wb: TeamWhiteboard) => void
@@ -24,11 +31,14 @@ export function TeamWhiteboardConnectedView({
   projectId,
   initialWhiteboard,
   currentUser,
+  userRole = 'owner',
+  permissions,
   relayUrl,
   syncToken,
   onPersist,
   onCreateTask
 }: Props): React.JSX.Element {
+  const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
   const { whiteboard, remoteCursors, syncWhiteboard, broadcastCursor } = useTeamWhiteboardSync({
     whiteboardId,
     projectId,
@@ -36,18 +46,22 @@ export function TeamWhiteboardConnectedView({
     currentUser,
     relayUrl,
     syncToken,
-    onPersist
+    onPersist: resolvedPermissions.canEditWhiteboard ? onPersist : undefined
   })
 
   return (
     <TeamWhiteboardView
       whiteboard={whiteboard ?? initialWhiteboard}
       remoteCursors={remoteCursors}
+      readOnly={!resolvedPermissions.canEditWhiteboard}
+      canCreateTask={resolvedPermissions.canEditBoard}
       onCursorMove={broadcastCursor}
       onChange={(updated) => {
-        syncWhiteboard(updated)
+        if (resolvedPermissions.canEditWhiteboard) {
+          syncWhiteboard(updated)
+        }
       }}
-      onCreateTask={onCreateTask}
+      onCreateTask={resolvedPermissions.canEditBoard ? onCreateTask : undefined}
     />
   )
 }

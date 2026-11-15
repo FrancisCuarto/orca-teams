@@ -15,6 +15,8 @@ type Props = {
   viewMode: 'edit' | 'preview'
   newTagInput: string
   hasExtractableTasks: boolean
+  readOnly?: boolean
+  canExtractToKanban?: boolean
   onViewModeChange: (mode: 'edit' | 'preview') => void
   onNewTagInputChange: (val: string) => void
   onUpdateNote: (updates: Partial<TeamNote>) => void
@@ -32,6 +34,8 @@ export function TeamNoteEditor({
   viewMode,
   newTagInput,
   hasExtractableTasks,
+  readOnly = false,
+  canExtractToKanban = true,
   onViewModeChange,
   onNewTagInputChange,
   onUpdateNote,
@@ -50,7 +54,13 @@ export function TeamNoteEditor({
         <div className="flex items-center gap-2 flex-1 min-w-[240px]">
           <Input
             value={note.title}
-            onChange={(e) => onUpdateNote({ title: e.target.value })}
+            readOnly={readOnly}
+            disabled={readOnly}
+            onChange={(e) => {
+              if (!readOnly) {
+                onUpdateNote({ title: e.target.value })
+              }
+            }}
             className="text-base font-semibold bg-transparent border-transparent hover:border-border focus:border-primary px-2 h-9"
             placeholder="Título del Documento o ADR..."
           />
@@ -60,12 +70,13 @@ export function TeamNoteEditor({
           {/* Category Select */}
           <select
             value={note.category}
+            disabled={readOnly}
             onChange={(e) => {
-              if (isTeamNoteCategory(e.target.value)) {
+              if (!readOnly && isTeamNoteCategory(e.target.value)) {
                 onUpdateNote({ category: e.target.value })
               }
             }}
-            className="bg-muted text-xs text-foreground rounded border border-border px-2 py-1 focus:outline-hidden"
+            className="bg-muted text-xs text-foreground rounded border border-border px-2 py-1 focus:outline-hidden disabled:opacity-60"
           >
             <option value="adr">ADR (Decisión)</option>
             <option value="spec">Spec (Especificación)</option>
@@ -77,12 +88,13 @@ export function TeamNoteEditor({
           {note.category === 'adr' && (
             <select
               value={note.status ?? 'proposed'}
+              disabled={readOnly}
               onChange={(e) => {
-                if (isTeamNoteStatus(e.target.value)) {
+                if (!readOnly && isTeamNoteStatus(e.target.value)) {
                   onUpdateNote({ status: e.target.value })
                 }
               }}
-              className="bg-muted text-xs text-foreground rounded border border-border px-2 py-1 focus:outline-hidden uppercase font-mono"
+              className="bg-muted text-xs text-foreground rounded border border-border px-2 py-1 focus:outline-hidden uppercase font-mono disabled:opacity-60"
             >
               <option value="draft">Draft</option>
               <option value="proposed">Proposed</option>
@@ -98,7 +110,7 @@ export function TeamNoteEditor({
               variant={viewMode === 'edit' ? 'secondary' : 'ghost'}
               onClick={() => onViewModeChange('edit')}
             >
-              Editar
+              {readOnly ? 'Markdown' : 'Editar'}
             </Button>
             <Button
               size="xs"
@@ -110,7 +122,7 @@ export function TeamNoteEditor({
           </div>
 
           {/* Extract to Kanban Button */}
-          {onExtractTasksToKanban && hasExtractableTasks && (
+          {onExtractTasksToKanban && hasExtractableTasks && canExtractToKanban && (
             <Button
               size="xs"
               variant="outline"
@@ -145,7 +157,17 @@ export function TeamNoteEditor({
           </Button>
 
           {/* Delete Note */}
-          <Button size="icon-xs" variant="ghost" onClick={onDeleteNote} title="Eliminar Documento">
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            disabled={readOnly}
+            onClick={() => {
+              if (!readOnly) {
+                onDeleteNote()
+              }
+            }}
+            title={readOnly ? 'Solo lectura: no puedes eliminar notas' : 'Eliminar Documento'}
+          >
             <Trash2 className="size-3.5 text-destructive" />
           </Button>
         </div>
@@ -160,30 +182,34 @@ export function TeamNoteEditor({
             className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-3xs font-medium border border-border"
           >
             {tag}
-            <button
-              type="button"
-              onClick={() => onRemoveTag(tag)}
-              className="text-muted-foreground hover:text-foreground ml-0.5"
-            >
-              ×
-            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={() => onRemoveTag(tag)}
+                className="text-muted-foreground hover:text-foreground ml-0.5"
+              >
+                ×
+              </button>
+            ) : null}
           </span>
         ))}
-        <div className="flex items-center gap-1 ml-1">
-          <input
-            type="text"
-            value={newTagInput}
-            onChange={(e) => onNewTagInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
-                e.preventDefault()
-                onAddTag()
-              }
-            }}
-            placeholder="+ tag..."
-            className="bg-transparent text-3xs text-foreground focus:outline-hidden w-16"
-          />
-        </div>
+        {!readOnly ? (
+          <div className="flex items-center gap-1 ml-1">
+            <input
+              type="text"
+              value={newTagInput}
+              onChange={(e) => onNewTagInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isImeOwnedKeyboardEvent(e)) {
+                  e.preventDefault()
+                  onAddTag()
+                }
+              }}
+              placeholder="+ tag..."
+              className="bg-transparent text-3xs text-foreground focus:outline-hidden w-16"
+            />
+          </div>
+        ) : null}
       </div>
 
       {/* Editor Body or Preview */}
@@ -191,12 +217,20 @@ export function TeamNoteEditor({
         {viewMode === 'edit' ? (
           <textarea
             value={note.content}
-            onChange={(e) => onUpdateNote({ content: e.target.value })}
+            readOnly={readOnly}
+            onChange={(e) => {
+              if (!readOnly) {
+                onUpdateNote({ content: e.target.value })
+              }
+            }}
             className="w-full h-full min-h-[400px] bg-transparent text-xs font-mono leading-relaxed text-foreground resize-none focus:outline-hidden"
             placeholder="Escribe en formato Markdown..."
           />
         ) : (
-          <TeamNotePreview content={note.content} onToggleChecklistLine={onToggleChecklistLine} />
+          <TeamNotePreview
+            content={note.content}
+            onToggleChecklistLine={readOnly ? undefined : onToggleChecklistLine}
+          />
         )}
       </div>
     </div>

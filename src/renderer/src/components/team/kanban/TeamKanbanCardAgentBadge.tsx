@@ -22,6 +22,7 @@ type Props = {
   assignee?: TeamKanbanAssignee
   executionStatus?: AgentExecutionStatus
   factoryRun?: FactoryRunRecord
+  canDispatchAgents?: boolean
   onDispatchAgent?: (card: TeamKanbanCard) => void
   onViewExecution?: (card: TeamKanbanCard) => void
   onStartFactory?: (card: TeamKanbanCard) => void
@@ -33,6 +34,7 @@ export function TeamKanbanCardAgentBadge({
   assignee,
   executionStatus,
   factoryRun,
+  canDispatchAgents = true,
   onDispatchAgent,
   onViewExecution,
   onStartFactory,
@@ -139,11 +141,18 @@ export function TeamKanbanCardAgentBadge({
         <Button
           size="xs"
           variant="ghost"
-          title="Despachar tarea al Agente de IA"
+          disabled={!canDispatchAgents}
+          title={
+            canDispatchAgents
+              ? 'Despachar tarea al Agente de IA'
+              : 'Solo lectura: no puedes ejecutar agentes'
+          }
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
-            onDispatchAgent(card)
+            if (canDispatchAgents) {
+              onDispatchAgent(card)
+            }
           }}
         >
           <Zap className="size-3 text-primary mr-1 inline" />

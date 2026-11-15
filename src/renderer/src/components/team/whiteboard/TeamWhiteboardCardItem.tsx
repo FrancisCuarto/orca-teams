@@ -15,6 +15,7 @@ type Props = {
   isDark: boolean
   isSelected: boolean
   isMermaidEdit: boolean
+  readOnly?: boolean
   onToggleMermaidEdit: () => void
   onMouseDown: (e: React.MouseEvent) => void
   onResizeMouseDown: (e: React.MouseEvent) => void
@@ -33,6 +34,7 @@ export function TeamWhiteboardCardItem({
   isDark,
   isSelected,
   isMermaidEdit,
+  readOnly = false,
   onToggleMermaidEdit,
   onMouseDown,
   onResizeMouseDown,
@@ -50,6 +52,7 @@ export function TeamWhiteboardCardItem({
         width={width}
         height={height}
         isSelected={isSelected}
+        readOnly={readOnly}
         onMouseDown={onMouseDown}
         onResizeMouseDown={onResizeMouseDown}
         onUpdate={onUpdate}
@@ -74,7 +77,9 @@ export function TeamWhiteboardCardItem({
         zIndex: (item.zIndex ?? 0) + 10,
         ...(item.strokeColor && !isMermaid ? { borderColor: item.strokeColor } : {})
       }}
-      className={`group absolute flex flex-col rounded-xl border backdrop-blur-md shadow-floating transition-shadow cursor-grab active:cursor-grabbing ${selectionRing} ${
+      className={`group absolute flex flex-col rounded-xl border backdrop-blur-md shadow-floating transition-shadow ${
+        readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+      } ${selectionRing} ${
         isMermaid ? 'bg-card/90 border-border' : `${swatch.cardBgClass} ${swatch.cardBorderClass}`
       }`}
     >
@@ -84,14 +89,19 @@ export function TeamWhiteboardCardItem({
           <input
             type="text"
             value={item.title ?? ''}
-            onChange={(e) => onUpdate({ title: e.target.value })}
+            readOnly={readOnly}
+            onChange={(e) => {
+              if (!readOnly) {
+                onUpdate({ title: e.target.value })
+              }
+            }}
             placeholder="Título..."
             className="bg-transparent text-xs font-semibold text-foreground focus:outline-hidden w-full"
           />
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {onCreateTask && (
+          {!readOnly && onCreateTask && (
             <Button
               size="icon-xs"
               variant="ghost"
@@ -102,7 +112,7 @@ export function TeamWhiteboardCardItem({
               <KanbanSquare className="size-3.5 text-git-graph-lane-2" />
             </Button>
           )}
-          {!isMermaid && (
+          {!readOnly && !isMermaid && (
             <Button size="icon-xs" variant="ghost" onClick={onCycleColor} title="Cambiar color">
               <Palette className="size-3.5" />
             </Button>
@@ -117,9 +127,11 @@ export function TeamWhiteboardCardItem({
               {isMermaidEdit ? <Eye className="size-3.5" /> : <Code className="size-3.5" />}
             </Button>
           )}
-          <Button size="icon-xs" variant="ghost" onClick={onDelete} title="Eliminar Elemento">
-            <Trash2 className="size-3.5" />
-          </Button>
+          {!readOnly ? (
+            <Button size="icon-xs" variant="ghost" onClick={onDelete} title="Eliminar Elemento">
+              <Trash2 className="size-3.5" />
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -128,7 +140,12 @@ export function TeamWhiteboardCardItem({
           isMermaidEdit ? (
             <textarea
               value={item.content}
-              onChange={(e) => onUpdate({ content: e.target.value })}
+              readOnly={readOnly}
+              onChange={(e) => {
+                if (!readOnly) {
+                  onUpdate({ content: e.target.value })
+                }
+              }}
               rows={8}
               className="w-full h-full p-2 text-xs font-mono bg-muted/60 text-foreground rounded border border-border resize-y focus:outline-hidden"
               placeholder="graph TD..."
@@ -141,7 +158,12 @@ export function TeamWhiteboardCardItem({
         ) : (
           <textarea
             value={item.content}
-            onChange={(e) => onUpdate({ content: e.target.value })}
+            readOnly={readOnly}
+            onChange={(e) => {
+              if (!readOnly) {
+                onUpdate({ content: e.target.value })
+              }
+            }}
             rows={5}
             className={`w-full flex-1 bg-transparent leading-relaxed text-foreground resize-none focus:outline-hidden placeholder:text-muted-foreground/60 ${fontClass}`}
             placeholder="Escribe tu nota aquí..."
@@ -149,14 +171,16 @@ export function TeamWhiteboardCardItem({
         )}
       </div>
 
-      <div
-        data-testid={`resize-handle-${item.id}`}
-        onMouseDown={onResizeMouseDown}
-        title="Redimensionar"
-        className={`absolute -bottom-1.5 -right-1.5 z-20 size-3.5 rounded-xs bg-primary border border-background cursor-nwse-resize shadow-xs transition-opacity ${
-          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}
-      />
+      {!readOnly ? (
+        <div
+          data-testid={`resize-handle-${item.id}`}
+          onMouseDown={onResizeMouseDown}
+          title="Redimensionar"
+          className={`absolute -bottom-1.5 -right-1.5 z-20 size-3.5 rounded-xs bg-primary border border-background cursor-nwse-resize shadow-xs transition-opacity ${
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+        />
+      ) : null}
     </div>
   )
 }

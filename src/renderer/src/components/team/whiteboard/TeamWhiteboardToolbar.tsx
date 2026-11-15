@@ -49,6 +49,7 @@ type Props = {
   zoom: number
   canUndo: boolean
   canRedo: boolean
+  readOnly?: boolean
   onSelectTool: (tool: WhiteboardTool, shapeKind?: WhiteboardShapeKind) => void
   onAddSticky: () => void
   onAddSpec: () => void
@@ -67,6 +68,7 @@ export function TeamWhiteboardToolbar({
   zoom,
   canUndo,
   canRedo,
+  readOnly = false,
   onSelectTool,
   onAddSticky,
   onAddSpec,
@@ -107,6 +109,7 @@ export function TeamWhiteboardToolbar({
         <div className="flex items-center gap-0.5 bg-muted/60 rounded-lg p-0.5 border border-border/60">
           <Button
             size="icon-xs"
+            disabled={readOnly}
             variant={activeTool === 'shape' && activeShapeKind === 'rect' ? 'secondary' : 'ghost'}
             onClick={() => onSelectTool('shape', 'rect')}
             title="Rectángulo (R)"
@@ -116,6 +119,7 @@ export function TeamWhiteboardToolbar({
           </Button>
           <Button
             size="icon-xs"
+            disabled={readOnly}
             variant={
               activeTool === 'shape' && activeShapeKind === 'ellipse' ? 'secondary' : 'ghost'
             }
@@ -127,6 +131,7 @@ export function TeamWhiteboardToolbar({
           </Button>
           <Button
             size="icon-xs"
+            disabled={readOnly}
             variant={
               activeTool === 'shape' && activeShapeKind === 'diamond' ? 'secondary' : 'ghost'
             }
@@ -138,6 +143,7 @@ export function TeamWhiteboardToolbar({
           </Button>
           <Button
             size="icon-xs"
+            disabled={readOnly}
             variant={activeTool === 'arrow' ? 'secondary' : 'ghost'}
             onClick={() => onSelectTool('arrow')}
             title="Flecha / Conector (A)"
@@ -147,6 +153,7 @@ export function TeamWhiteboardToolbar({
           </Button>
           <Button
             size="icon-xs"
+            disabled={readOnly}
             variant={activeTool === 'draw' ? 'secondary' : 'ghost'}
             onClick={() => onSelectTool('draw')}
             title="Lápiz libre (P)"
@@ -157,19 +164,25 @@ export function TeamWhiteboardToolbar({
         </div>
 
         {/* Cards & Mermaid */}
-        <Button size="xs" variant="outline" onClick={onAddSticky}>
+        <Button size="xs" variant="outline" disabled={readOnly} onClick={onAddSticky}>
           <StickyNote className="size-3.5 text-git-graph-lane-1" />+ Nota
         </Button>
-        <Button size="xs" variant="outline" onClick={onAddSpec}>
+        <Button size="xs" variant="outline" disabled={readOnly} onClick={onAddSpec}>
           <FileText className="size-3.5 text-git-graph-lane-2" />+ Spec
         </Button>
-        <Button size="xs" variant="outline" onClick={() => onAddMermaid()}>
+        <Button size="xs" variant="outline" disabled={readOnly} onClick={() => onAddMermaid()}>
           <Workflow className="size-3.5" />+ Mermaid
         </Button>
 
         <div className="hidden xl:flex items-center gap-0.5">
           {ARCHITECTURE_TEMPLATES.map((tpl) => (
-            <Button key={tpl.id} size="xs" variant="ghost" onClick={() => onAddMermaid(tpl)}>
+            <Button
+              key={tpl.id}
+              size="xs"
+              variant="ghost"
+              disabled={readOnly}
+              onClick={() => onAddMermaid(tpl)}
+            >
               {tpl.label}
             </Button>
           ))}
@@ -180,7 +193,7 @@ export function TeamWhiteboardToolbar({
           <Button
             size="icon-xs"
             variant="ghost"
-            disabled={!canUndo}
+            disabled={readOnly || !canUndo}
             onClick={onUndo}
             title="Deshacer (Ctrl+Z)"
             aria-label="Deshacer"
@@ -190,7 +203,7 @@ export function TeamWhiteboardToolbar({
           <Button
             size="icon-xs"
             variant="ghost"
-            disabled={!canRedo}
+            disabled={readOnly || !canRedo}
             onClick={onRedo}
             title="Rehacer (Ctrl+Shift+Z)"
             aria-label="Rehacer"

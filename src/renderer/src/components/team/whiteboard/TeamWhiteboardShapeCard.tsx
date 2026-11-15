@@ -9,6 +9,7 @@ type Props = {
   width: number
   height: number
   isSelected: boolean
+  readOnly?: boolean
   onMouseDown: (e: React.MouseEvent) => void
   onResizeMouseDown: (e: React.MouseEvent) => void
   onUpdate: (updates: Partial<TeamWhiteboardItem>) => void
@@ -21,6 +22,7 @@ export function TeamWhiteboardShapeCard({
   width,
   height,
   isSelected,
+  readOnly = false,
   onMouseDown,
   onResizeMouseDown,
   onUpdate
@@ -52,7 +54,9 @@ export function TeamWhiteboardShapeCard({
         height: `${height}px`,
         zIndex: (item.zIndex ?? 0) + 10
       }}
-      className={`group absolute rounded-xl cursor-grab active:cursor-grabbing ${selectionRing}`}
+      className={`group absolute rounded-xl ${
+        readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+      } ${selectionRing}`}
     >
       <div className="relative w-full h-full flex items-center justify-center p-4">
         <svg
@@ -95,20 +99,27 @@ export function TeamWhiteboardShapeCard({
 
         <textarea
           value={item.content}
-          onChange={(e) => onUpdate({ content: e.target.value })}
+          readOnly={readOnly}
+          onChange={(e) => {
+            if (!readOnly) {
+              onUpdate({ content: e.target.value })
+            }
+          }}
           placeholder="Etiqueta..."
           rows={2}
           className={`relative z-10 w-4/5 bg-transparent text-center font-medium resize-none focus:outline-hidden select-text ${fontClass} ${textColorClass}`}
         />
 
-        <div
-          data-testid={`resize-handle-${item.id}`}
-          onMouseDown={onResizeMouseDown}
-          title="Redimensionar"
-          className={`absolute -bottom-1.5 -right-1.5 z-20 size-3.5 rounded-xs bg-primary border border-background cursor-nwse-resize shadow-xs transition-opacity ${
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}
-        />
+        {!readOnly ? (
+          <div
+            data-testid={`resize-handle-${item.id}`}
+            onMouseDown={onResizeMouseDown}
+            title="Redimensionar"
+            className={`absolute -bottom-1.5 -right-1.5 z-20 size-3.5 rounded-xs bg-primary border border-background cursor-nwse-resize shadow-xs transition-opacity ${
+              isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
+          />
+        ) : null}
       </div>
     </div>
   )
