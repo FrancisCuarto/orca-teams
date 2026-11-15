@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { toast } from 'sonner'
 import { TeamNotesView } from './TeamNotesView'
 import type { TeamNotesCollection } from '../../../../../shared/teamwork/team-kanban-types'
 
@@ -36,8 +37,22 @@ function createSampleNotesCollection(): TeamNotesCollection {
 }
 
 describe('TeamNotesView', () => {
+  const originalApiDescriptor = Object.getOwnPropertyDescriptor(window, 'api')
+  const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+
   afterEach(() => {
     cleanup()
+    vi.restoreAllMocks()
+    if (originalApiDescriptor) {
+      Object.defineProperty(window, 'api', originalApiDescriptor)
+    } else {
+      Reflect.deleteProperty(window, 'api')
+    }
+    if (originalClipboardDescriptor) {
+      Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor)
+    } else {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
   })
 
   it('renderiza la lista de notas en el sidebar y el contenido de la nota activa', () => {
@@ -96,5 +111,84 @@ describe('TeamNotesView', () => {
       'ADR 001: Persistencia Relacional',
       collection.notes[0]?.content
     )
+  })
+
+  it('copia la nota como Markdown con "Copiar MD" usando window.api.ui.writeClipboardText', async () => {
+    const writeClipboardText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ui: { writeClipboardText } }
+    })
+    const successSpy = vi.spyOn(toast, 'success')
+
+    const collection = createSampleNotesCollection()
+    render(<TeamNotesView notesCollection={collection} onChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /copiar md/i }))
+
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledWith(
+        '# ADR 001: Persistencia Relacional\n\n# ADR 001\n\n- [ ] Crear migraciones de base de datos\n- [x] Diseñar esquema'
+      )
+      expect(successSpy).toHaveBeenCalled()
+    })
+  })
+
+  it('copia el contexto para agente con "Copiar para Agente" haciendo fallback a navigator.clipboard.writeText', async () => {
+    const writeClipboardText = vi.fn().mockRejectedValue(new Error('IPC unavailable'))
+    const navWriteText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ui: { writeClipboardText } }
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: navWriteText }
+    })
+    const successSpy = vi.spyOn(toast, 'success')
+
+    const collection = createSampleNotesCollection()
+    render(<TeamNotesView notesCollection={collection} onChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /copiar para agente/i }))
+
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledTimes(1)
+      expect(navWriteText).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[CONTEXTO DE EQUIPO Y ARQUITECTURA: ADR 001: Persistencia Relacional]'
+        )
+      )
+      expect(successSpy).toHaveBeenCalled()
+    })
+  })
+
+  it('muestra toast.error si falla el portapapeles al copiar MD', async () => {
+    const writeClipboardText = vi.fn().mockRejectedValue(new Error('IPC failed'))
+    const navWriteText = vi.fn().mockRejectedValue(new Error('Clipboard blocked'))
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ui: { writeClipboardText } }
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: navWriteText }
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(false)
+    })
+    const successSpy = vi.spyOn(toast, 'success')
+    const errorSpy = vi.spyOn(toast, 'error')
+
+    const collection = createSampleNotesCollection()
+    render(<TeamNotesView notesCollection={collection} onChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /copiar md/i }))
+
+    await waitFor(() => {
+      expect(errorSpy).toHaveBeenCalled()
+    })
+    expect(successSpy).not.toHaveBeenCalled()
   })
 })

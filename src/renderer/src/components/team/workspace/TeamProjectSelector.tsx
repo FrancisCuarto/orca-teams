@@ -9,24 +9,41 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import type { Project, Team, TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
+import type {
+  Project,
+  Team,
+  TeamInvitation,
+  TeamRole
+} from '../../../../../shared/teamwork/team-workspace-types'
+import type {
+  TeamMailConfigInput,
+  TeamMailConfigPublic,
+  TeamMemberWithProfile,
+  TeamSendInvitationResult
+} from '../../../../../shared/teamwork/team-ipc-types'
 import { TeamCreateModal } from './TeamCreateModal'
 import { ProjectCreateModal } from './ProjectCreateModal'
 import { TeamMembersModal } from './TeamMembersModal'
-
-const INITIAL_MEMBER_JOINED_AT = 1700000000
 
 type Props = {
   teams: Team[]
   activeTeam: Team | null
   projects: Project[]
   activeProject: Project | null
+  members: TeamMemberWithProfile[]
+  pendingInvitations: TeamInvitation[]
+  mailConfig: TeamMailConfigPublic | null
   userRole: TeamRole
   onSelectTeam: (teamId: string) => void
   onSelectProject: (projectId: string) => void
   onCreateTeam: (team: Omit<Team, 'createdAt' | 'updatedAt'>) => void
   onCreateProject: (project: Omit<Project, 'createdAt' | 'updatedAt'>) => void
-  onInviteMember: (email: string, role: TeamRole) => Promise<string>
+  onInviteMember: (email: string, role: TeamRole) => Promise<TeamSendInvitationResult>
+  onResendInvitation: (invitationId: string) => Promise<TeamSendInvitationResult>
+  onRevokeInvitation: (invitationId: string) => Promise<void>
+  onAcceptInvitation: (token: string, displayName?: string, email?: string) => Promise<unknown>
+  onSaveMailConfig: (input: TeamMailConfigInput) => Promise<TeamMailConfigPublic>
+  onTestMailConfig: (toEmail: string) => Promise<{ ok: boolean; error?: string }>
 }
 
 export function TeamProjectSelector({
@@ -34,39 +51,27 @@ export function TeamProjectSelector({
   activeTeam,
   projects,
   activeProject,
+  members,
+  pendingInvitations,
+  mailConfig,
   userRole,
   onSelectTeam,
   onSelectProject,
   onCreateTeam,
   onCreateProject,
-  onInviteMember
+  onInviteMember,
+  onResendInvitation,
+  onRevokeInvitation,
+  onAcceptInvitation,
+  onSaveMailConfig,
+  onTestMailConfig
 }: Props): React.JSX.Element {
   const [teamModalOpen, setTeamModalOpen] = useState(false)
   const [projectModalOpen, setProjectModalOpen] = useState(false)
   const [membersModalOpen, setMembersModalOpen] = useState(false)
 
-  const mockMembers = [
-    {
-      teamId: activeTeam?.id ?? 'team-1',
-      userId: 'usr-francis',
-      role: 'owner' as const,
-      joinedAt: INITIAL_MEMBER_JOINED_AT,
-      displayName: 'Francis (Lead)',
-      email: 'francis@orca.run'
-    },
-    {
-      teamId: activeTeam?.id ?? 'team-1',
-      userId: 'usr-alex',
-      role: 'member' as const,
-      joinedAt: INITIAL_MEMBER_JOINED_AT,
-      displayName: 'Alex Frontend',
-      email: 'alex@orca.run'
-    }
-  ]
-
   return (
     <div className="flex items-center gap-2 border-b border-border bg-card/40 px-4 py-2">
-      {/* Selector de Equipo */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-semibold">
@@ -108,7 +113,6 @@ export function TeamProjectSelector({
 
       <span className="text-muted-foreground/40">/</span>
 
-      {/* Selector de Proyecto */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
@@ -158,7 +162,6 @@ export function TeamProjectSelector({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Acciones del Equipo / Miembros */}
       <div className="ml-auto flex items-center gap-2">
         <Button
           variant="ghost"
@@ -167,14 +170,13 @@ export function TeamProjectSelector({
           onClick={() => setMembersModalOpen(true)}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>Miembros</span>
+          <span>Miembros & Invitaciones</span>
           <Badge variant="outline" className="text-3xs px-1 py-0">
-            {mockMembers.length}
+            {members.length}
           </Badge>
         </Button>
       </div>
 
-      {/* Modales */}
       <TeamCreateModal
         open={teamModalOpen}
         onOpenChange={setTeamModalOpen}
@@ -183,7 +185,7 @@ export function TeamProjectSelector({
 
       <ProjectCreateModal
         open={projectModalOpen}
-        teamId={activeTeam?.id ?? 'default-team'}
+        teamId={activeTeam?.id ?? 'team-orca-core'}
         teamName={activeTeam?.name ?? 'Equipo'}
         onOpenChange={setProjectModalOpen}
         onCreate={onCreateProject}
@@ -192,10 +194,17 @@ export function TeamProjectSelector({
       <TeamMembersModal
         open={membersModalOpen}
         teamName={activeTeam?.name ?? 'Equipo'}
-        members={mockMembers}
+        members={members}
+        pendingInvitations={pendingInvitations}
+        mailConfig={mailConfig}
         userRole={userRole}
         onOpenChange={setMembersModalOpen}
         onInviteMember={onInviteMember}
+        onResendInvitation={onResendInvitation}
+        onRevokeInvitation={onRevokeInvitation}
+        onAcceptInvitation={onAcceptInvitation}
+        onSaveMailConfig={onSaveMailConfig}
+        onTestMailConfig={onTestMailConfig}
       />
     </div>
   )

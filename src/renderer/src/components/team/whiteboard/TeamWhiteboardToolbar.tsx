@@ -1,14 +1,26 @@
 import React from 'react'
-import { ClipboardCopy, FileText, Minus, Plus, RotateCcw, StickyNote, Workflow } from 'lucide-react'
+import {
+  ArrowUpRight,
+  Circle,
+  ClipboardCopy,
+  Diamond,
+  Download,
+  FileText,
+  Hand,
+  Maximize2,
+  Minus,
+  MousePointer2,
+  Pencil,
+  Plus,
+  Redo2,
+  Square,
+  StickyNote,
+  Undo2,
+  Workflow
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { WhiteboardColor } from '../../../../../shared/teamwork/team-kanban-types'
-
-const SWATCH_COLORS: { color: WhiteboardColor; className: string }[] = [
-  { color: 'green', className: 'bg-emerald-500 border-emerald-400' },
-  { color: 'blue', className: 'bg-blue-500 border-blue-400' },
-  { color: 'pink', className: 'bg-pink-500 border-pink-400' },
-  { color: 'purple', className: 'bg-purple-500 border-purple-400' }
-]
+import type { WhiteboardShapeKind } from '../../../../../shared/teamwork/team-kanban-types'
+import type { WhiteboardTool } from './whiteboard-types'
 
 export const ARCHITECTURE_TEMPLATES: { id: string; label: string; mermaid: string }[] = [
   {
@@ -32,85 +44,204 @@ export const ARCHITECTURE_TEMPLATES: { id: string; label: string; mermaid: strin
 ]
 
 type Props = {
+  activeTool: WhiteboardTool
+  activeShapeKind: WhiteboardShapeKind
   zoom: number
-  onAddSticky: (color?: WhiteboardColor) => void
+  canUndo: boolean
+  canRedo: boolean
+  onSelectTool: (tool: WhiteboardTool, shapeKind?: WhiteboardShapeKind) => void
+  onAddSticky: () => void
   onAddSpec: () => void
   onAddMermaid: (template?: { label: string; mermaid: string }) => void
+  onUndo: () => void
+  onRedo: () => void
   onZoom: (delta: number) => void
-  onResetView: () => void
-  onCopyForAgent: () => void
+  onFitView: () => void
+  onExportSvg: () => void
+  onCopyMarkdown: () => void
 }
 
 export function TeamWhiteboardToolbar({
+  activeTool,
+  activeShapeKind,
   zoom,
+  canUndo,
+  canRedo,
+  onSelectTool,
   onAddSticky,
   onAddSpec,
   onAddMermaid,
+  onUndo,
+  onRedo,
   onZoom,
-  onResetView,
-  onCopyForAgent
+  onFitView,
+  onExportSvg,
+  onCopyMarkdown
 }: Props): React.JSX.Element {
   return (
     <>
-      {/* Top Floating Whiteboard Toolbar */}
-      <div className="absolute top-4 left-6 z-20 flex flex-wrap items-center gap-2 max-w-[calc(100%-16rem)] bg-card/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-border shadow-floating">
-        <span className="text-xs font-semibold text-foreground mr-1">Pizarra:</span>
-
-        <Button size="xs" variant="outline" onClick={() => onAddSticky('yellow')}>
-          <StickyNote className="text-git-graph-lane-1" />+ Nota
-        </Button>
-
-        {SWATCH_COLORS.map(({ color, className }) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onAddSticky(color)}
-            className={`size-4 rounded-full border transition-transform hover:scale-125 ${className}`}
-            title={`Añadir nota ${color}`}
-          />
-        ))}
-
-        <Button size="xs" variant="outline" onClick={onAddSpec}>
-          <FileText className="text-git-graph-lane-2" />+ Spec
-        </Button>
-
-        <Button size="xs" variant="outline" onClick={() => onAddMermaid()}>
-          <Workflow />+ Diagrama Mermaid
-        </Button>
-
-        <span className="text-2xs font-medium text-muted-foreground">Plantillas:</span>
-        {ARCHITECTURE_TEMPLATES.map((template) => (
+      <div className="absolute top-3 left-4 z-30 flex flex-wrap items-center gap-1.5 max-w-[calc(100%-17rem)] bg-card/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-border shadow-floating">
+        {/* Pointer & Canvas Navigation */}
+        <div className="flex items-center gap-0.5 bg-muted/60 rounded-lg p-0.5 border border-border/60">
           <Button
-            key={template.id}
-            size="xs"
-            variant="ghost"
-            onClick={() => onAddMermaid(template)}
+            size="icon-xs"
+            variant={activeTool === 'select' ? 'secondary' : 'ghost'}
+            onClick={() => onSelectTool('select')}
+            title="Seleccionar / Mover (V)"
+            aria-label="Seleccionar"
           >
-            {template.label}
+            <MousePointer2 className="size-3.5" />
           </Button>
-        ))}
+          <Button
+            size="icon-xs"
+            variant={activeTool === 'pan' ? 'secondary' : 'ghost'}
+            onClick={() => onSelectTool('pan')}
+            title="Mover lienzo (H o Espacio)"
+            aria-label="Mano"
+          >
+            <Hand className="size-3.5" />
+          </Button>
+        </div>
 
-        <div className="flex items-center gap-1">
-          <Button size="icon-xs" variant="ghost" onClick={() => onZoom(-0.15)} title="Alejar">
-            <Minus />
+        {/* Drawing & Shape Tools */}
+        <div className="flex items-center gap-0.5 bg-muted/60 rounded-lg p-0.5 border border-border/60">
+          <Button
+            size="icon-xs"
+            variant={activeTool === 'shape' && activeShapeKind === 'rect' ? 'secondary' : 'ghost'}
+            onClick={() => onSelectTool('shape', 'rect')}
+            title="Rectángulo (R)"
+            aria-label="Rectángulo"
+          >
+            <Square className="size-3.5" />
           </Button>
-          <span className="text-2xs font-mono text-muted-foreground w-9 text-center">
+          <Button
+            size="icon-xs"
+            variant={
+              activeTool === 'shape' && activeShapeKind === 'ellipse' ? 'secondary' : 'ghost'
+            }
+            onClick={() => onSelectTool('shape', 'ellipse')}
+            title="Elipse (O)"
+            aria-label="Elipse"
+          >
+            <Circle className="size-3.5" />
+          </Button>
+          <Button
+            size="icon-xs"
+            variant={
+              activeTool === 'shape' && activeShapeKind === 'diamond' ? 'secondary' : 'ghost'
+            }
+            onClick={() => onSelectTool('shape', 'diamond')}
+            title="Rombo"
+            aria-label="Rombo"
+          >
+            <Diamond className="size-3.5" />
+          </Button>
+          <Button
+            size="icon-xs"
+            variant={activeTool === 'arrow' ? 'secondary' : 'ghost'}
+            onClick={() => onSelectTool('arrow')}
+            title="Flecha / Conector (A)"
+            aria-label="Flecha"
+          >
+            <ArrowUpRight className="size-3.5" />
+          </Button>
+          <Button
+            size="icon-xs"
+            variant={activeTool === 'draw' ? 'secondary' : 'ghost'}
+            onClick={() => onSelectTool('draw')}
+            title="Lápiz libre (P)"
+            aria-label="Lápiz"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        </div>
+
+        {/* Cards & Mermaid */}
+        <Button size="xs" variant="outline" onClick={onAddSticky}>
+          <StickyNote className="size-3.5 text-git-graph-lane-1" />+ Nota
+        </Button>
+        <Button size="xs" variant="outline" onClick={onAddSpec}>
+          <FileText className="size-3.5 text-git-graph-lane-2" />+ Spec
+        </Button>
+        <Button size="xs" variant="outline" onClick={() => onAddMermaid()}>
+          <Workflow className="size-3.5" />+ Mermaid
+        </Button>
+
+        <div className="hidden xl:flex items-center gap-0.5">
+          {ARCHITECTURE_TEMPLATES.map((tpl) => (
+            <Button key={tpl.id} size="xs" variant="ghost" onClick={() => onAddMermaid(tpl)}>
+              {tpl.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Undo / Redo */}
+        <div className="flex items-center gap-0.5 border-l border-border pl-1.5">
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            disabled={!canUndo}
+            onClick={onUndo}
+            title="Deshacer (Ctrl+Z)"
+            aria-label="Deshacer"
+          >
+            <Undo2 className="size-3.5" />
+          </Button>
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            disabled={!canRedo}
+            onClick={onRedo}
+            title="Rehacer (Ctrl+Shift+Z)"
+            aria-label="Rehacer"
+          >
+            <Redo2 className="size-3.5" />
+          </Button>
+        </div>
+
+        {/* Zoom & Fit */}
+        <div className="flex items-center gap-0.5 border-l border-border pl-1.5">
+          <Button size="icon-xs" variant="ghost" onClick={() => onZoom(-0.15)} title="Alejar">
+            <Minus className="size-3.5" />
+          </Button>
+          <span className="text-2xs font-mono text-muted-foreground w-10 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <Button size="icon-xs" variant="ghost" onClick={() => onZoom(0.15)} title="Acercar">
-            <Plus />
+            <Plus className="size-3.5" />
           </Button>
-          <Button size="icon-xs" variant="ghost" onClick={onResetView} title="Reiniciar Vista">
-            <RotateCcw />
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={onFitView}
+            title="Centrar vista"
+            aria-label="Fit"
+          >
+            <Maximize2 className="size-3 mr-1" />
+            Fit
           </Button>
         </div>
       </div>
 
-      {/* Agent Export */}
-      <div className="absolute top-4 right-6 z-20 bg-card/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-border shadow-floating">
-        <Button size="xs" variant="outline" onClick={onCopyForAgent} title="Copiar pizarra">
-          <ClipboardCopy className="text-git-graph-lane-1" />
-          Copiar para Agente
+      {/* Right Floating Export Controls */}
+      <div className="absolute top-3 right-4 z-30 flex items-center gap-1.5 bg-card/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-border shadow-floating">
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onExportSvg}
+          title="Descargar pizarra como SVG"
+        >
+          <Download className="size-3.5 text-git-graph-lane-2" />
+          Exportar SVG
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onCopyMarkdown}
+          title="Copiar pizarra como Markdown"
+        >
+          <ClipboardCopy className="size-3.5 text-git-graph-lane-1" />
+          Copiar MD
         </Button>
       </div>
     </>
