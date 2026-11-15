@@ -31,7 +31,8 @@ export default function TeamPage(): React.JSX.Element {
     activeWorktreePath: activeWorktree?.path,
     activeRepoId: activeRepo?.id,
     activeRepoPath: activeRepo?.path,
-    activeRepoDisplayName: activeRepo?.displayName
+    activeRepoDisplayName: activeRepo?.displayName,
+    currentUserId: syncAndAuth.user.userId
   })
 
   const activeProjectId = registry.currentProject?.id ?? 'proj-default'

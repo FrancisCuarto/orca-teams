@@ -5,6 +5,7 @@ import {
   configuredAgentToMemberEntry,
   type TeamMemberEntry
 } from '../../../../../shared/teamwork/team-members'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
 export { configuredAgentsToMemberEntries, configuredAgentToMemberEntry }
 export type { TeamMemberEntry }
@@ -17,16 +18,9 @@ export type UseInstalledConfiguredAgentsResult = {
   refreshAgents: () => Promise<ConfiguredTeamAgent[]>
 }
 
-function getTeamApi() {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-  return window.api?.team
-}
-
 export function useInstalledConfiguredAgents(): UseInstalledConfiguredAgentsResult {
   const [agents, setAgents] = useState<ConfiguredTeamAgent[]>([])
-  const [loading, setLoading] = useState<boolean>(() => Boolean(getTeamApi()?.listConfiguredAgents))
+  const [loading, setLoading] = useState<boolean>(() => Boolean(getTeamsTeamApi()?.listConfiguredAgents))
   const [error, setError] = useState<string | null>(null)
   const requestSeqRef = useRef(0)
   const mountedRef = useRef(true)
@@ -39,7 +33,7 @@ export function useInstalledConfiguredAgents(): UseInstalledConfiguredAgentsResu
   }, [])
 
   const fetchAgents = useCallback(async (refresh: boolean): Promise<ConfiguredTeamAgent[]> => {
-    const teamApi = getTeamApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi?.listConfiguredAgents) {
       if (mountedRef.current) {
         setAgents([])

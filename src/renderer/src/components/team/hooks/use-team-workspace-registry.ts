@@ -13,11 +13,11 @@ import type {
   TeamRole
 } from '../../../../../shared/teamwork/team-workspace-types'
 import type { ExtendedTeamMember } from '../../../../../shared/teamwork/team-kanban-types'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 import {
   acceptTeamInvitationAction,
   createProjectAction,
   createTeamAction,
-  getTeamPreloadApi,
   resendTeamInvitationAction,
   saveTeamMailConfigAction,
   sendTeamInvitationAction,
@@ -32,6 +32,7 @@ export function useTeamWorkspaceRegistry(options: {
   activeRepoId?: string
   activeRepoPath?: string | null
   activeRepoDisplayName?: string
+  currentUserId?: string
 }) {
   const defaultTeam: Team = useMemo(
     () => ({
@@ -92,7 +93,7 @@ export function useTeamWorkspaceRegistry(options: {
   const [mailConfig, setMailConfig] = useState<TeamMailConfigPublic | null>(null)
 
   const loadWorkspace = useCallback(async () => {
-    const teamApi = getTeamPreloadApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi) {
       return
     }
@@ -152,7 +153,12 @@ export function useTeamWorkspaceRegistry(options: {
     [activeTeam, invitationsByTeam]
   )
 
-  const currentUserId = activeTeam?.ownerId ?? 'usr-francis'
+  const currentUserId =
+    options.currentUserId &&
+    options.currentUserId !== 'local-owner' &&
+    options.currentUserId !== 'web-guest'
+      ? options.currentUserId
+      : (activeTeam?.ownerId ?? options.currentUserId ?? 'usr-francis')
   const currentUserMember =
     activeMembers.find((m) => m.userId === currentUserId) ?? activeMembers[0]
   const currentUserName = currentUserMember?.displayName ?? 'Francis (Lead)'
@@ -234,7 +240,7 @@ export function useTeamWorkspaceRegistry(options: {
 
   const handleRevokeInvitation = useCallback(
     async (invitationId: string): Promise<void> => {
-      const teamApi = getTeamPreloadApi()
+      const teamApi = getTeamsTeamApi()
       if (teamApi?.revokeInvitation) {
         await teamApi.revokeInvitation(invitationId, currentUserId)
       }

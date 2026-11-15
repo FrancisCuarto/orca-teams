@@ -4,7 +4,7 @@ import type {
   TeamSyncSettings,
   TeamUserProfile
 } from '../../../../../shared/teamwork/team-workspace-types'
-import { getTeamPreloadApi } from './use-team-workspace-registry-actions'
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
 const FALLBACK_USER: TeamUserProfile = {
   userId: 'local-owner',
@@ -32,7 +32,7 @@ export function useTeamSyncAndAuth() {
   const [syncStatus, setSyncStatus] = useState<TeamSyncRuntimeStatus>(FALLBACK_SYNC_STATUS)
 
   const refreshSyncAndAuth = useCallback(async () => {
-    const teamApi = getTeamPreloadApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi) {
       return
     }
@@ -44,7 +44,7 @@ export function useTeamSyncAndAuth() {
       setUser(loadedUser)
       setSyncStatus(loadedSync)
     } catch {
-      // Keep local fallback when IPC is unavailable (e.g. unit tests / web mode).
+      // Keep local fallback when runtime API is unavailable.
     }
   }, [])
 
@@ -54,7 +54,7 @@ export function useTeamSyncAndAuth() {
 
   const updateProfile = useCallback(
     async (input: { displayName: string; email: string }): Promise<TeamUserProfile> => {
-      const teamApi = getTeamPreloadApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi) {
         const next = { ...user, ...input, authenticatedAt: Date.now() }
         setUser(next)
@@ -68,18 +68,18 @@ export function useTeamSyncAndAuth() {
   )
 
   const requestMagicCode = useCallback(async (email: string, displayName?: string) => {
-    const teamApi = getTeamPreloadApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi) {
-      throw new Error('Runtime de escritorio no disponible')
+      throw new Error('Servicio de autenticación no disponible')
     }
     return teamApi.requestMagicLinkCode(email, displayName)
   }, [])
 
   const verifyMagicCode = useCallback(
     async (email: string, code: string, displayName?: string): Promise<TeamUserProfile> => {
-      const teamApi = getTeamPreloadApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi) {
-        throw new Error('Runtime de escritorio no disponible')
+        throw new Error('Servicio de autenticación no disponible')
       }
       const verified = await teamApi.verifyMagicLinkCode(email, code, displayName)
       setUser(verified)
@@ -90,7 +90,7 @@ export function useTeamSyncAndAuth() {
 
   const configureSync = useCallback(
     async (settings: Partial<TeamSyncSettings>): Promise<TeamSyncRuntimeStatus> => {
-      const teamApi = getTeamPreloadApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi) {
         const merged: TeamSyncRuntimeStatus = {
           ...syncStatus,

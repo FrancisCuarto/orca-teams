@@ -8,13 +8,7 @@ import type {
   AgentExecutionRecord,
   AgentExecutionStatus
 } from '../../../../../shared/teamwork/team-workspace-types'
-
-function getTeamApi() {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-  return window.api?.team
-}
+import { getTeamsTeamApi } from '../storage/team-web-relay-api'
 
 export type UseTeamAgentExecutionsResult = {
   executionsByCard: Map<string, AgentExecutionRecord>
@@ -73,7 +67,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
   }, [])
 
   useEffect(() => {
-    const teamApi = getTeamApi()
+    const teamApi = getTeamsTeamApi()
     if (!teamApi?.onExecutionEvent) {
       return
     }
@@ -88,7 +82,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
 
   const startCardExecution = useCallback(
     async (request: TeamStartExecutionRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.startExecution) {
         return null
       }
@@ -101,7 +95,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
 
   const cancelExecution = useCallback(
     async (executionId: string): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.cancelExecution) {
         return null
       }
@@ -116,7 +110,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
 
   const approveExecution = useCallback(
     async (options: TeamApproveExecutionRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.approveExecution) {
         return null
       }
@@ -131,7 +125,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
 
   const rejectExecution = useCallback(
     async (options: TeamRejectExecutionRequest): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.rejectExecution) {
         return null
       }
@@ -151,7 +145,7 @@ export function useTeamAgentExecutions(): UseTeamAgentExecutionsResult {
 
   const hydrateLatestForCard = useCallback(
     async (cardId: string): Promise<AgentExecutionRecord | null> => {
-      const teamApi = getTeamApi()
+      const teamApi = getTeamsTeamApi()
       if (!teamApi?.getLatestExecutionForCard) {
         return executionsByCard.get(cardId) ?? null
       }
