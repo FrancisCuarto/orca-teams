@@ -13,6 +13,8 @@ import { TeamKanbanCardAgentBadge } from './TeamKanbanCardAgentBadge'
 type Props = {
   card: TeamKanbanCard
   columns?: TeamKanbanColumn[]
+  isReadOnly?: boolean
+  canDispatchAgents?: boolean
   onEdit: (card: TeamKanbanCard) => void
   onDispatchAgent?: (card: TeamKanbanCard) => void
   executionStatus?: AgentExecutionStatus
@@ -35,6 +37,8 @@ const PRIORITY_STYLES: Record<
 export function TeamKanbanCardItem({
   card,
   columns,
+  isReadOnly = false,
+  canDispatchAgents = true,
   onEdit,
   onDispatchAgent,
   executionStatus,
@@ -46,7 +50,7 @@ export function TeamKanbanCardItem({
   const [isChecklistExpanded, setIsChecklistExpanded] = useState(false)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
-    useSortable({ id: card.id })
+    useSortable({ id: card.id, disabled: isReadOnly })
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -63,9 +67,11 @@ export function TeamKanbanCardItem({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...(isReadOnly ? {} : listeners)}
       onClick={() => onEdit(card)}
-      className={`group relative flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing ${
+      className={`group relative flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-xs transition-all ${
+        isReadOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+      } ${
         isOver
           ? 'ring-2 ring-ring border-ring bg-accent/60 shadow-floating scale-[1.01]'
           : 'border-border hover:border-ring/50'
@@ -87,7 +93,7 @@ export function TeamKanbanCardItem({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {columns && onQuickMoveColumn && columns.length > 1 ? (
+          {!isReadOnly && columns && onQuickMoveColumn && columns.length > 1 ? (
             <div
               className="opacity-0 group-hover:opacity-100 transition-opacity"
               onPointerDown={(e) => e.stopPropagation()}
@@ -213,6 +219,7 @@ export function TeamKanbanCardItem({
           card={card}
           assignee={card.assignee}
           executionStatus={executionStatus}
+          canDispatchAgents={canDispatchAgents}
           onDispatchAgent={onDispatchAgent}
           onViewExecution={onViewExecution}
         />
@@ -228,13 +235,20 @@ export function TeamKanbanCardItem({
           {card.checklist.map((item) => (
             <label
               key={item.id}
-              className="flex items-center gap-1.5 text-3xs text-foreground cursor-pointer hover:bg-muted/40 p-1 rounded transition-colors"
+              className={`flex items-center gap-1.5 text-3xs text-foreground p-1 rounded transition-colors ${
+                isReadOnly ? 'cursor-default' : 'cursor-pointer hover:bg-muted/40'
+              }`}
             >
               <input
                 type="checkbox"
                 checked={item.done}
-                onChange={() => onToggleChecklistItem?.(card.id, item.id)}
-                className="size-3 rounded border-input text-primary focus:ring-primary cursor-pointer shrink-0"
+                disabled={isReadOnly}
+                onChange={() => {
+                  if (!isReadOnly) {
+                    onToggleChecklistItem?.(card.id, item.id)
+                  }
+                }}
+                className="size-3 rounded border-input text-primary focus:ring-primary cursor-pointer shrink-0 disabled:cursor-default"
               />
               <span
                 className={item.done ? 'line-through text-muted-foreground truncate' : 'truncate'}

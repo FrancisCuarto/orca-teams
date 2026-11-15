@@ -20,6 +20,8 @@ import { getItemBounds, getMaxZIndex, isBoxItem, type WhiteboardTool } from './w
 type Props = {
   whiteboard: TeamWhiteboard
   remoteCursors?: WhiteboardCursorPresence[]
+  readOnly?: boolean
+  canCreateTask?: boolean
   onCursorMove?: (x: number, y: number) => void
   onChange: (updated: TeamWhiteboard) => void
   onCreateTask?: (item: TeamWhiteboardItem) => void
@@ -32,6 +34,8 @@ const DOT_GRID_BG =
 export function TeamWhiteboardView({
   whiteboard,
   remoteCursors = EMPTY_CURSORS,
+  readOnly = false,
+  canCreateTask = true,
   onCursorMove,
   onChange,
   onCreateTask
@@ -49,41 +53,55 @@ export function TeamWhiteboardView({
 
   const mutateBoard = useCallback(
     (updates: Partial<TeamWhiteboard>) => {
+      if (readOnly) {
+        return
+      }
       onChange({ ...whiteboard, ...updates, updatedAt: Date.now() })
     },
-    [onChange, whiteboard]
+    [onChange, readOnly, whiteboard]
   )
 
   const commitItems = useCallback(
     (nextItems: TeamWhiteboardItem[]) => {
+      if (readOnly) {
+        return
+      }
       history.recordSnapshot(whiteboard.items)
       mutateBoard({ items: nextItems })
     },
-    [history, mutateBoard, whiteboard.items]
+    [history, mutateBoard, readOnly, whiteboard.items]
   )
 
   const commitViewport = useCallback(
     (next: { x: number; y: number; zoom: number }) => {
       setZoom(next.zoom)
       setPan({ x: next.x, y: next.y })
-      mutateBoard({ viewport: next })
+      if (!readOnly) {
+        mutateBoard({ viewport: next })
+      }
     },
-    [mutateBoard]
+    [mutateBoard, readOnly]
   )
 
   const handleUndo = useCallback(() => {
+    if (readOnly) {
+      return
+    }
     const prev = history.undo(whiteboard.items)
     if (prev) {
       mutateBoard({ items: prev })
     }
-  }, [history, mutateBoard, whiteboard.items])
+  }, [history, mutateBoard, readOnly, whiteboard.items])
 
   const handleRedo = useCallback(() => {
+    if (readOnly) {
+      return
+    }
     const next = history.redo(whiteboard.items)
     if (next) {
       mutateBoard({ items: next })
     }
-  }, [history, mutateBoard, whiteboard.items])
+  }, [history, mutateBoard, readOnly, whiteboard.items])
 
   const selectedItem = useMemo(
     () => whiteboard.items.find((item) => item.id === selectedItemId) ?? null,
@@ -101,7 +119,7 @@ export function TeamWhiteboardView({
     onSelectTool: setActiveTool,
     onCommitItems: commitItems,
     onMutateBoard: mutateBoard,
-    onCreateTask
+    onCreateTask: canCreateTask && !readOnly ? onCreateTask : undefined
   })
 
   const interactions = useWhiteboardInteractions({
@@ -109,14 +127,20 @@ export function TeamWhiteboardView({
     items: whiteboard.items,
     zoom,
     pan,
-    activeTool,
+    activeTool: readOnly && (activeTool === 'draw' || activeTool === 'arrow' || activeTool === 'shape') ? 'select' : activeTool,
     activeShapeKind,
     selectedItemId,
+    readOnly,
     onSelectItem: setSelectedItemId,
-    onSelectTool: setActiveTool,
+    onSelectTool: (tool) => {
+      if (readOnly && (tool === 'draw' || tool === 'arrow' || tool === 'shape')) {
+        return
+      }
+      setActiveTool(tool)
+    },
     onPanChange: (nextPan, commit) => {
       setPan(nextPan)
-      if (commit) {
+      if (commit && !readOnly) {
         mutateBoard({ viewport: { ...nextPan, zoom } })
       }
     },
@@ -129,7 +153,7 @@ export function TeamWhiteboardView({
     onRedo: handleRedo,
     onDuplicateSelected: actions.duplicateSelected,
     onDeleteSelected: () => {
-      if (selectedItemId) {
+      if (!readOnly && selectedItemId) {
         actions.deleteItem(selectedItemId)
       }
     }
@@ -165,7 +189,11 @@ export function TeamWhiteboardView({
         zoom={zoom}
         canUndo={history.canUndo}
         canRedo={history.canRedo}
+        readOnly={readOnly}
         onSelectTool={(tool, shapeKind) => {
+          if (readOnly && (tool === 'draw' || tool === 'arrow' || tool === 'shape')) {
+            return
+          }
           setActiveTool(tool)
           if (shapeKind) {
             setActiveShapeKind(shapeKind)
@@ -231,6 +259,7 @@ export function TeamWhiteboardView({
                 isDark={isDark}
                 isSelected={selectedItemId === item.id}
                 isMermaidEdit={Boolean(mermaidEditMode[item.id])}
+                readOnly={readOnly}
                 onToggleMermaidEdit={() =>
                   setMermaidEditMode((p) => ({ ...p, [item.id]: !p[item.id] }))
                 }
@@ -239,16 +268,20 @@ export function TeamWhiteboardView({
                 onUpdate={(updates) => actions.updateItem(item.id, updates)}
                 onDelete={() => actions.deleteItem(item.id)}
                 onCycleColor={() => actions.cycleColor(item)}
-                onCreateTask={() => {
-                  void actions.createTaskForItem(item)
-                }}
+                onCreateTask={
+                  canCreateTask && !readOnly
+                    ? () => {
+                        void actions.createTaskForItem(item)
+                      }
+                    : undefined
+                }
               />
             )
           })}
         </div>
       </div>
 
-      {selectedItem && (
+      {!readOnly && selectedItem && (
         <TeamWhiteboardPropertiesBar
           item={selectedItem}
           onUpdate={(updates) => actions.updateItem(selectedItem.id, updates, true)}
@@ -261,9 +294,13 @@ export function TeamWhiteboardView({
             )
           }
           onDelete={handleDeleteSelected}
-          onCreateTask={() => {
-            void actions.createTaskForItem(selectedItem)
-          }}
+          onCreateTask={
+            canCreateTask
+              ? () => {
+                  void actions.createTaskForItem(selectedItem)
+                }
+              : undefined
+          }
         />
       )}
 

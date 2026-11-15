@@ -10,6 +10,7 @@ type Props = {
   activeNoteId: string | null
   searchQuery: string
   selectedCategory: string
+  readOnly?: boolean
   onSearchChange: (q: string) => void
   onSelectCategory: (cat: string) => void
   onSelectNote: (id: string) => void
@@ -21,6 +22,7 @@ export function TeamNotesSidebar({
   activeNoteId,
   searchQuery,
   selectedCategory,
+  readOnly = false,
   onSearchChange,
   onSelectCategory,
   onSelectNote,
@@ -35,14 +37,29 @@ export function TeamNotesSidebar({
             Documentación Viva
           </span>
           <div className="flex items-center gap-1">
-            <Button size="xs" variant="outline" onClick={() => onCreateNote('adr')}>
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={readOnly}
+              onClick={() => {
+                if (!readOnly) {
+                  onCreateNote('adr')
+                }
+              }}
+              title={readOnly ? 'Solo lectura: no puedes crear notas' : 'Crear nuevo ADR'}
+            >
               + ADR
             </Button>
             <Button
               size="icon-xs"
               variant="outline"
-              onClick={() => onCreateNote('general')}
-              title="Crear Nota en Blanco"
+              disabled={readOnly}
+              onClick={() => {
+                if (!readOnly) {
+                  onCreateNote('general')
+                }
+              }}
+              title={readOnly ? 'Solo lectura: no puedes crear notas' : 'Crear Nota en Blanco'}
             >
               <Plus />
             </Button>

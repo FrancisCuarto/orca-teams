@@ -3,6 +3,11 @@ import type {
   ExtendedTeamMember,
   TeamKanbanBoard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import {
+  getTeamPermissions,
+  type TeamPermissions
+} from '../../../../../shared/teamwork/team-rbac-policy'
+import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
 import { useTeamKanbanSync } from '../hooks/use-team-kanban-sync'
 import { TeamBoardPresenceBar } from './TeamBoardPresenceBar'
 import { TeamKanbanBoardView } from './TeamKanbanBoardView'
@@ -17,6 +22,8 @@ type Props = {
     avatarUrl?: string
     color?: string
   }
+  userRole?: TeamRole
+  permissions?: TeamPermissions
   humanMembers?: ExtendedTeamMember[]
   relayUrl?: string | null
   syncToken?: string
@@ -28,11 +35,14 @@ export function TeamKanbanConnectedView({
   projectPath,
   initialBoard,
   currentUser,
+  userRole = 'owner',
+  permissions,
   humanMembers,
   relayUrl,
   syncToken,
   onPersist
 }: Props): React.JSX.Element {
+  const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
   const { board, presences, syncStatus, syncBoard } = useTeamKanbanSync({
     boardId: initialBoard.id,
     projectId,
@@ -40,7 +50,7 @@ export function TeamKanbanConnectedView({
     relayUrl,
     syncToken,
     initialBoard,
-    onPersist
+    onPersist: resolvedPermissions.canEditBoard ? onPersist : undefined
   })
 
   const activeBoard = board ?? initialBoard
@@ -67,8 +77,14 @@ export function TeamKanbanConnectedView({
         projectPath={projectPath}
         currentUserId={currentUser.userId}
         currentUserName={currentUser.displayName}
+        userRole={userRole}
+        permissions={resolvedPermissions}
         humanMembers={humanMembers}
-        onChange={syncBoard}
+        onChange={(updatedBoard) => {
+          if (resolvedPermissions.canEditBoard) {
+            syncBoard(updatedBoard)
+          }
+        }}
       />
     </div>
   )

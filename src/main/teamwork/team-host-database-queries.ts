@@ -3,6 +3,7 @@ import { mapProjectRow, mapTeamRow } from '../../shared/teamwork/team-row-mapper
 import {
   isTeamRole,
   type InvitationStatus,
+  type ProjectMember,
   type TeamInvitation
 } from '../../shared/teamwork/team-workspace-types'
 import type {
@@ -53,9 +54,13 @@ export function queryWorkspaceSnapshot(db: DatabaseSync): TeamWorkspaceSnapshot 
 
   const membersByTeam: Record<string, TeamMemberWithProfile[]> = {}
   const invitationsByTeam: Record<string, TeamInvitation[]> = {}
+  const projectMembersByProject: Record<string, ProjectMember[]> = {}
   for (const team of teams) {
     membersByTeam[team.id] = []
     invitationsByTeam[team.id] = []
+  }
+  for (const project of projects) {
+    projectMembersByProject[project.id] = []
   }
 
   const memberRows = db
@@ -83,6 +88,27 @@ export function queryWorkspaceSnapshot(db: DatabaseSync): TeamWorkspaceSnapshot 
     })
   }
 
+  const projectMemberRows = db
+    .prepare(
+      `SELECT project_id, user_id, role, joined_at
+       FROM project_members
+       ORDER BY joined_at ASC`
+    )
+    .all()
+  for (const row of projectMemberRows) {
+    if (!isRecord(row)) {
+      continue
+    }
+    const projectId = String(row.project_id)
+    const list = projectMembersByProject[projectId] ?? (projectMembersByProject[projectId] = [])
+    list.push({
+      projectId,
+      userId: String(row.user_id),
+      role: isTeamRole(row.role) ? row.role : 'member',
+      joinedAt: Number(row.joined_at)
+    })
+  }
+
   const now = Date.now()
   const invitationRows = db.prepare('SELECT * FROM team_invitations ORDER BY created_at DESC').all()
   for (const row of invitationRows) {
@@ -97,5 +123,5 @@ export function queryWorkspaceSnapshot(db: DatabaseSync): TeamWorkspaceSnapshot 
     list.push(inv)
   }
 
-  return { teams, projects, membersByTeam, invitationsByTeam }
+  return { teams, projects, membersByTeam, invitationsByTeam, projectMembersByProject }
 }

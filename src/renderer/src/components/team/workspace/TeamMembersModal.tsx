@@ -20,6 +20,7 @@ import {
   type TeamInvitation,
   type TeamRole
 } from '../../../../../shared/teamwork/team-workspace-types'
+import { getTeamPermissions } from '../../../../../shared/teamwork/team-rbac-policy'
 import type {
   TeamMailConfigInput,
   TeamMailConfigPublic,
@@ -77,7 +78,7 @@ export function TeamMembersModal({
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const canManageMembers = userRole === 'owner' || userRole === 'admin'
+  const { canManageMembers } = getTeamPermissions(userRole)
 
   const handleInvite = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -302,6 +303,7 @@ export function TeamMembersModal({
           <TeamPendingInvitationsList
             teamName={teamName}
             invitations={pendingInvitations}
+            canManageMembers={canManageMembers}
             onResend={async (id) => {
               if (!onResendInvitation) {
                 return

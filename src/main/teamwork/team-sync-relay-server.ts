@@ -6,7 +6,8 @@ import { app } from 'electron'
 import * as Y from 'yjs'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { TeamSyncRuntimeStatus } from '../../shared/teamwork/team-ipc-types'
-import type { TeamSyncSettings } from '../../shared/teamwork/team-workspace-types'
+import { canAccessProject } from '../../shared/teamwork/team-rbac-policy'
+import type { TeamRole, TeamSyncSettings } from '../../shared/teamwork/team-workspace-types'
 import {
   decodeUint8ArrayBase64,
   encodeUint8ArrayBase64,
@@ -21,6 +22,19 @@ const DEFAULT_HOST_PORT = 4789
 type RoomClient = {
   socket: WebSocket
   userId: string
+  role: TeamRole | null
+}
+
+function parseRoomScope(roomId: string): { projectId?: string; teamId?: string } {
+  const projectMatch = /^project:([^:]+):/.exec(roomId)
+  if (projectMatch?.[1]) {
+    return { projectId: projectMatch[1] }
+  }
+  const teamMatch = /^team:([^:]+):/.exec(roomId)
+  if (teamMatch?.[1]) {
+    return { teamId: teamMatch[1] }
+  }
+  return {}
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -144,6 +158,7 @@ export class TeamSyncRelayServer {
     wss.on('connection', (socket) => {
       let joinedRoomId: string | null = null
       let joinedUserId: string | null = null
+      let joinedRole: TeamRole | null = null
 
       socket.on('message', (data) => {
         const text = typeof data === 'string' ? data : data.toString('utf8')
@@ -157,10 +172,16 @@ export class TeamSyncRelayServer {
             socket.close(4001, 'Unauthorized')
             return
           }
+          const access = this.resolveSocketAccess(msg.roomId, msg.userId)
+          if (!access.allowed) {
+            socket.close(4003, 'Forbidden')
+            return
+          }
           joinedRoomId = msg.roomId
           joinedUserId = msg.userId
+          joinedRole = access.role
           const clients = this.rooms.get(msg.roomId) ?? new Set<RoomClient>()
-          clients.add({ socket, userId: msg.userId })
+          clients.add({ socket, userId: msg.userId, role: access.role })
           this.rooms.set(msg.roomId, clients)
 
           const doc = this.getOrLoadRoomDoc(msg.roomId)
@@ -178,6 +199,12 @@ export class TeamSyncRelayServer {
         }
 
         if (msg.type === 'sync-state' || msg.type === 'sync-update') {
+          const actorId = joinedUserId ?? msg.senderId
+          const latestAccess = this.resolveSocketAccess(msg.roomId, actorId)
+          const effectiveRole = latestAccess.role ?? joinedRole
+          if (!latestAccess.allowed || effectiveRole === 'viewer') {
+            return
+          }
           const doc = this.getOrLoadRoomDoc(msg.roomId)
           const update = decodeUint8ArrayBase64(msg.payloadBase64)
           Y.applyUpdate(doc, update)
@@ -265,6 +292,44 @@ export class TeamSyncRelayServer {
       activeRooms: this.rooms.size,
       ...(this.lastError ? { lastError: this.lastError } : {})
     }
+  }
+
+  private resolveSocketAccess(
+    roomId: string,
+    userId: string
+  ): { role: TeamRole | null; allowed: boolean } {
+    const scope = parseRoomScope(roomId)
+    if (scope.projectId) {
+      const project = this.db.getProject?.(scope.projectId) ?? null
+      if (project) {
+        const role = this.db.getTeamMemberRole?.(project.teamId, userId) ?? null
+        if (project.visibility === 'private') {
+          const isExplicit = this.db.isExplicitProjectMember?.(project.id, userId) ?? false
+          return {
+            role,
+            allowed: canAccessProject(project, role, isExplicit)
+          }
+        }
+        return { role, allowed: true }
+      }
+    }
+
+    if (scope.teamId) {
+      const role = this.db.getTeamMemberRole?.(scope.teamId, userId) ?? null
+      return { role, allowed: true }
+    }
+
+    if (typeof this.db.getWorkspaceSnapshot === 'function') {
+      const snapshot = this.db.getWorkspaceSnapshot()
+      if (snapshot.teams.length === 1) {
+        const role = this.db.getTeamMemberRole?.(snapshot.teams[0].id, userId) ?? null
+        if (role) {
+          return { role, allowed: true }
+        }
+      }
+    }
+
+    return { role: null, allowed: true }
   }
 
   private getOrLoadRoomDoc(roomId: string): Y.Doc {

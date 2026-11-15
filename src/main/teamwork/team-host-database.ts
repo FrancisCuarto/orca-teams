@@ -10,7 +10,8 @@ import type {
   Project,
   Team,
   TeamActivityEntry,
-  TeamInvitation
+  TeamInvitation,
+  TeamRole
 } from '../../shared/teamwork/team-workspace-types'
 import type {
   TeamMemberWithProfile,
@@ -159,6 +160,29 @@ export class TeamHostDatabase {
 
   getTeam(teamId: string): Team | null {
     return this.service.getTeam(teamId)
+  }
+
+  getTeamMemberRole(teamId: string, userId: string): TeamRole | null {
+    return this.service.getTeamMemberRole(teamId, userId)
+  }
+
+  getProject(projectId: string): Project | null {
+    return this.service.getProject(projectId)
+  }
+
+  isExplicitProjectMember(projectId: string, userId: string): boolean {
+    const row = this.db
+      .prepare('SELECT user_id FROM project_members WHERE project_id = ? AND user_id = ?')
+      .get(projectId, userId)
+    return isRecord(row)
+  }
+
+  canUserAccessProject(options: {
+    projectId: string
+    userId: string
+    requiredRole?: TeamRole
+  }): boolean {
+    return this.service.canUserAccessProject(options)
   }
 
   getInvitationById(invitationId: string): TeamInvitation | null {

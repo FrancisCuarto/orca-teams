@@ -8,10 +8,16 @@ import type {
 } from '../../../../../shared/teamwork/team-ipc-types'
 import type {
   Project,
+  ProjectMember,
   Team,
   TeamInvitation,
   TeamRole
 } from '../../../../../shared/teamwork/team-workspace-types'
+import {
+  canAccessProject,
+  getTeamPermissions,
+  type TeamPermissions
+} from '../../../../../shared/teamwork/team-rbac-policy'
 import type { ExtendedTeamMember } from '../../../../../shared/teamwork/team-kanban-types'
 import {
   acceptTeamInvitationAction,
@@ -32,6 +38,7 @@ export function useTeamWorkspaceRegistry(options: {
   activeRepoId?: string
   activeRepoPath?: string | null
   activeRepoDisplayName?: string
+  currentUserId?: string
 }) {
   const defaultTeam: Team = useMemo(
     () => ({
@@ -89,6 +96,10 @@ export function useTeamWorkspaceRegistry(options: {
     [defaultTeam.id]: [defaultOwnerMember]
   })
   const [invitationsByTeam, setInvitationsByTeam] = useState<Record<string, TeamInvitation[]>>({})
+  const [projectMembersByProject, setProjectMembersByProject] = useState<
+    Record<string, ProjectMember[]>
+  >({})
+  const [hasLoadedSnapshot, setHasLoadedSnapshot] = useState(false)
   const [mailConfig, setMailConfig] = useState<TeamMailConfigPublic | null>(null)
 
   const loadWorkspace = useCallback(async () => {
@@ -102,6 +113,7 @@ export function useTeamWorkspaceRegistry(options: {
         teamApi.getMailConfig()
       ])
       setMailConfig(loadedMailConfig)
+      setHasLoadedSnapshot(true)
       if (snapshot.teams.length > 0) {
         setTeams(snapshot.teams)
         setActiveTeamId((prev) =>
@@ -116,6 +128,7 @@ export function useTeamWorkspaceRegistry(options: {
       }
       setMembersByTeam(snapshot.membersByTeam)
       setInvitationsByTeam(snapshot.invitationsByTeam)
+      setProjectMembersByProject(snapshot.projectMembersByProject ?? {})
     } catch (err) {
       console.warn('Error loading team workspace snapshot:', err)
     }
@@ -134,16 +147,15 @@ export function useTeamWorkspaceRegistry(options: {
       return projects
     }
     const matching = projects.filter((p) => p.teamId === activeTeam.id)
-    return matching.length > 0 ? matching : projects
-  }, [activeTeam, projects])
-  const currentProject = useMemo(
-    () => teamProjects.find((p) => p.id === activeProjectId) ?? teamProjects[0] ?? null,
-    [teamProjects, activeProjectId]
-  )
+    return matching.length > 0 ? matching : hasLoadedSnapshot ? [] : projects
+  }, [activeTeam, projects, hasLoadedSnapshot])
   const activeMembers = useMemo(() => {
     const list = activeTeam ? membersByTeam[activeTeam.id] : undefined
-    return list && list.length > 0 ? list : [defaultOwnerMember]
-  }, [activeTeam, membersByTeam, defaultOwnerMember])
+    if (list && list.length > 0) {
+      return list
+    }
+    return hasLoadedSnapshot ? [] : [defaultOwnerMember]
+  }, [activeTeam, membersByTeam, defaultOwnerMember, hasLoadedSnapshot])
   const activePendingInvitations = useMemo(
     () =>
       activeTeam
@@ -152,11 +164,33 @@ export function useTeamWorkspaceRegistry(options: {
     [activeTeam, invitationsByTeam]
   )
 
-  const currentUserId = activeTeam?.ownerId ?? 'usr-francis'
-  const currentUserMember =
-    activeMembers.find((m) => m.userId === currentUserId) ?? activeMembers[0]
+  const currentUserId =
+    options.currentUserId?.trim() || activeTeam?.ownerId || defaultOwnerMember.userId
+  const explicitMember = activeMembers.find((m) => m.userId === currentUserId)
+  const currentUserMember = explicitMember ?? (hasLoadedSnapshot ? undefined : activeMembers[0])
   const currentUserName = currentUserMember?.displayName ?? 'Francis (Lead)'
-  const userRole: TeamRole = currentUserMember?.role ?? 'owner'
+  const userRole: TeamRole = explicitMember
+    ? explicitMember.role
+    : activeTeam?.ownerId === currentUserId
+      ? 'owner'
+      : hasLoadedSnapshot
+        ? 'viewer'
+        : (currentUserMember?.role ?? 'owner')
+  const permissions: TeamPermissions = useMemo(() => getTeamPermissions(userRole), [userRole])
+
+  const visibleProjects = useMemo(
+    () =>
+      teamProjects.filter((project) => {
+        const projectMembers = projectMembersByProject[project.id] ?? []
+        const isExplicitMember = projectMembers.some((m) => m.userId === currentUserId)
+        return canAccessProject(project, userRole, isExplicitMember)
+      }),
+    [teamProjects, projectMembersByProject, currentUserId, userRole]
+  )
+  const currentProject = useMemo(
+    () => visibleProjects.find((p) => p.id === activeProjectId) ?? visibleProjects[0] ?? null,
+    [visibleProjects, activeProjectId]
+  )
 
   const humanMembers: ExtendedTeamMember[] = useMemo(
     () =>
@@ -184,17 +218,38 @@ export function useTeamWorkspaceRegistry(options: {
 
   const handleCreateProject = useCallback(
     async (newProj: Omit<Project, 'createdAt' | 'updatedAt'>) => {
+      if (!permissions.canCreateProject) {
+        toast.error('Permisos insuficientes: tu rol no permite crear proyectos')
+        return
+      }
       const created = await createProjectAction(newProj, currentUserId)
       setProjects((prev) => [...prev.filter((p) => p.id !== created.id), created])
+      if (created.visibility === 'private') {
+        setProjectMembersByProject((prev) => ({
+          ...prev,
+          [created.id]: [
+            ...(prev[created.id] ?? []),
+            {
+              projectId: created.id,
+              userId: currentUserId,
+              role: 'owner',
+              joinedAt: created.createdAt
+            }
+          ]
+        }))
+      }
       setActiveProjectId(created.id)
       void loadWorkspace()
       toast.success(`Proyecto '${created.name}' creado con éxito`)
     },
-    [currentUserId, loadWorkspace]
+    [currentUserId, loadWorkspace, permissions.canCreateProject]
   )
 
   const handleSendInvitation = useCallback(
     async (email: string, role: TeamRole): Promise<TeamSendInvitationResult> => {
+      if (!permissions.canManageMembers) {
+        throw new Error('Permisos insuficientes: se requiere rol admin u owner para invitar')
+      }
       const teamId = activeTeam?.id ?? defaultTeam.id
       const result = await sendTeamInvitationAction({
         teamId,
@@ -213,7 +268,7 @@ export function useTeamWorkspaceRegistry(options: {
       }))
       return result
     },
-    [activeTeam, defaultTeam, currentUserId, currentUserName]
+    [activeTeam, defaultTeam, currentUserId, currentUserName, permissions.canManageMembers]
   )
 
   const handleResendInvitation = useCallback(
@@ -234,6 +289,10 @@ export function useTeamWorkspaceRegistry(options: {
 
   const handleRevokeInvitation = useCallback(
     async (invitationId: string): Promise<void> => {
+      if (!permissions.canManageMembers) {
+        toast.error('Permisos insuficientes: se requiere rol admin u owner para revocar')
+        return
+      }
       const teamApi = getTeamPreloadApi()
       if (teamApi?.revokeInvitation) {
         await teamApi.revokeInvitation(invitationId, currentUserId)
@@ -246,7 +305,7 @@ export function useTeamWorkspaceRegistry(options: {
       }
       toast.success('Invitación revocada')
     },
-    [activeTeam, currentUserId]
+    [activeTeam, currentUserId, permissions.canManageMembers]
   )
 
   const handleAcceptInvitation = useCallback(
@@ -275,14 +334,16 @@ export function useTeamWorkspaceRegistry(options: {
   return {
     teams,
     activeTeam,
-    projects: teamProjects,
+    projects: visibleProjects,
     currentProject,
     activeMembers,
     activePendingInvitations,
+    projectMembersByProject,
     humanMembers,
     mailConfig,
     currentUserId,
     userRole,
+    permissions,
     setActiveTeamId,
     setActiveProjectId,
     handleCreateTeam,

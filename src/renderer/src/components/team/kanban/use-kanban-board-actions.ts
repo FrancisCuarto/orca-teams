@@ -27,6 +27,8 @@ type Options = {
   projectId: string
   projectPath?: string | null
   actorUserId: string
+  canEditBoard?: boolean
+  canDispatchAgents?: boolean
   configuredAgents: readonly TeamMemberEntry[]
   executionsByCard: Map<string, AgentExecutionRecord>
   startCardExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord | null>
@@ -41,6 +43,8 @@ export function useKanbanBoardActions(options: Options) {
     projectId,
     projectPath,
     actorUserId,
+    canEditBoard = true,
+    canDispatchAgents = true,
     configuredAgents,
     executionsByCard,
     startCardExecution,
@@ -49,10 +53,24 @@ export function useKanbanBoardActions(options: Options) {
     onChange
   } = options
 
-  const secondary = useKanbanBoardSecondaryActions(board, onChange)
+  const guardedOnChange = useCallback(
+    (updatedBoard: TeamKanbanBoard) => {
+      if (!canEditBoard) {
+        return
+      }
+      onChange(updatedBoard)
+    },
+    [canEditBoard, onChange]
+  )
+
+  const secondary = useKanbanBoardSecondaryActions(board, guardedOnChange)
 
   const triggerImmediateExecution = useCallback(
     async (card: TeamKanbanCard): Promise<void> => {
+      if (!canDispatchAgents) {
+        toast.error('Permisos insuficientes: tu rol no permite ejecutar agentes')
+        return
+      }
       if (card.assignee?.type !== 'agent') {
         return
       }
@@ -83,6 +101,7 @@ export function useKanbanBoardActions(options: Options) {
       }
     },
     [
+      canDispatchAgents,
       configuredAgents,
       startCardExecution,
       projectId,
@@ -95,6 +114,9 @@ export function useKanbanBoardActions(options: Options) {
 
   const handleSaveCard = useCallback(
     (savedCard: TeamKanbanCard) => {
+      if (!canEditBoard) {
+        return
+      }
       const prevCard = board.cards[savedCard.id]
       const willExecute = shouldTriggerExecutionOnSave(prevCard, savedCard, executionsByCard)
       const nextColumnId =
@@ -105,17 +127,27 @@ export function useKanbanBoardActions(options: Options) {
         nextColumnId !== savedCard.columnId ? { ...savedCard, columnId: nextColumnId } : savedCard
 
       const { nextBoard, isNew } = upsertKanbanCard(board, cardToSave)
-      onChange(nextBoard)
+      guardedOnChange(nextBoard)
       toast.success(isNew ? 'Tarea creada' : 'Tarea actualizada')
-      if (willExecute) {
+      if (willExecute && canDispatchAgents) {
         void triggerImmediateExecution(cardToSave)
       }
     },
-    [board, executionsByCard, onChange, triggerImmediateExecution]
+    [
+      board,
+      canDispatchAgents,
+      canEditBoard,
+      executionsByCard,
+      guardedOnChange,
+      triggerImmediateExecution
+    ]
   )
 
   const handleAssignDraggedMember = useCallback(
     (cardId: string, dragged: TeamKanbanAssignee) => {
+      if (!canEditBoard) {
+        return
+      }
       const assigned = assignMemberToKanbanCard(board, cardId, dragged)
       if (!assigned) {
         return
@@ -133,28 +165,32 @@ export function useKanbanBoardActions(options: Options) {
           updatedCard = moved.cards[updatedCard.id]
         }
       }
-      onChange(finalBoard)
+      guardedOnChange(finalBoard)
       toast.success(`Tarea asignada a ${dragged.name}`)
-      if (updatedCard && dragged.type === 'agent') {
+      if (updatedCard && dragged.type === 'agent' && canDispatchAgents) {
         void triggerImmediateExecution(updatedCard)
       }
     },
-    [board, onChange, triggerImmediateExecution]
+    [board, canDispatchAgents, canEditBoard, guardedOnChange, triggerImmediateExecution]
   )
 
   const handleDispatchAgent = useCallback(
     (card: TeamKanbanCard) => {
+      if (!canDispatchAgents) {
+        toast.error('Permisos insuficientes: tu rol no permite ejecutar agentes')
+        return
+      }
       let targetCard = card
-      if (shouldMoveToInProgress(board, card.columnId)) {
+      if (canEditBoard && shouldMoveToInProgress(board, card.columnId)) {
         const moved = moveKanbanCardToColumn(board, card.id, 'col-in-progress')
         if (moved) {
-          onChange(moved)
+          guardedOnChange(moved)
           targetCard = moved.cards[card.id] ?? card
         }
       }
       void triggerImmediateExecution(targetCard)
     },
-    [board, onChange, triggerImmediateExecution]
+    [board, canDispatchAgents, canEditBoard, guardedOnChange, triggerImmediateExecution]
   )
 
   const handleViewExecution = useCallback(

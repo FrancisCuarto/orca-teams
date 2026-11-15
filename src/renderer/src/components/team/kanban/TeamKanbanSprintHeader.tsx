@@ -9,23 +9,32 @@ import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-ke
 type Props = {
   sprintGoal?: string
   metrics: BoardSprintMetrics
+  canEdit?: boolean
   onSaveSprintGoal: (goal?: string) => void
 }
 
 export function TeamKanbanSprintHeader({
   sprintGoal,
   metrics,
+  canEdit = true,
   onSaveSprintGoal
 }: Props): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
 
   const handleStartEdit = (): void => {
+    if (!canEdit) {
+      return
+    }
     setInputVal(sprintGoal ?? '')
     setIsEditing(true)
   }
 
   const handleSave = (): void => {
+    if (!canEdit) {
+      setIsEditing(false)
+      return
+    }
     onSaveSprintGoal(inputVal.trim() || undefined)
     setIsEditing(false)
   }
@@ -71,23 +80,25 @@ export function TeamKanbanSprintHeader({
         ) : (
           <div className="flex items-center gap-1 flex-1 min-w-0">
             <span
-              className={`truncate cursor-pointer hover:underline ${
+              className={`truncate ${canEdit ? 'cursor-pointer hover:underline' : 'cursor-default'} ${
                 sprintGoal ? 'text-foreground font-medium' : 'text-muted-foreground italic'
               }`}
-              onClick={handleStartEdit}
-              title="Clic para editar objetivo del sprint"
+              onClick={canEdit ? handleStartEdit : undefined}
+              title={canEdit ? 'Clic para editar objetivo del sprint' : sprintGoal}
             >
-              {sprintGoal || 'Sin objetivo establecido. Clic para definir.'}
+              {sprintGoal || (canEdit ? 'Sin objetivo establecido. Clic para definir.' : 'Sin objetivo establecido.')}
             </span>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              onClick={handleStartEdit}
-              className="size-5 text-muted-foreground hover:text-foreground"
-              title="Editar objetivo"
-            >
-              <Edit2 className="size-2.5" />
-            </Button>
+            {canEdit ? (
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                onClick={handleStartEdit}
+                className="size-5 text-muted-foreground hover:text-foreground"
+                title="Editar objetivo"
+              >
+                <Edit2 className="size-2.5" />
+              </Button>
+            ) : null}
           </div>
         )}
       </div>

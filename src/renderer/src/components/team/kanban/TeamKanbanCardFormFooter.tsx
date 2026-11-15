@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 type Props = {
   card: TeamKanbanCard | null
   canSave: boolean
+  readOnly?: boolean
+  canDispatchAgents?: boolean
   onClose: () => void
   onSave: () => void
   onDelete?: (cardId: string) => void
@@ -16,6 +18,8 @@ type Props = {
 export function TeamKanbanCardFormFooter({
   card,
   canSave,
+  readOnly = false,
+  canDispatchAgents = true,
   onClose,
   onSave,
   onDelete,
@@ -30,9 +34,12 @@ export function TeamKanbanCardFormFooter({
               type="button"
               variant="destructive"
               size="sm"
+              disabled={readOnly}
               onClick={() => {
-                onDelete(card.id)
-                onClose()
+                if (!readOnly) {
+                  onDelete(card.id)
+                  onClose()
+                }
               }}
             >
               <Trash2 className="size-3.5" /> Eliminar
@@ -43,9 +50,12 @@ export function TeamKanbanCardFormFooter({
               type="button"
               variant="outline"
               size="sm"
+              disabled={!canDispatchAgents}
               onClick={() => {
-                onDispatchAgent(card)
-                onClose()
+                if (canDispatchAgents) {
+                  onDispatchAgent(card)
+                  onClose()
+                }
               }}
             >
               <Zap className="size-3.5 text-git-graph-lane-1" /> Ejecutar
@@ -54,9 +64,9 @@ export function TeamKanbanCardFormFooter({
         </div>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
+            {readOnly ? 'Cerrar' : 'Cancelar'}
           </Button>
-          <Button type="button" size="sm" onClick={onSave} disabled={!canSave}>
+          <Button type="button" size="sm" onClick={onSave} disabled={!canSave || readOnly}>
             <Check className="size-3.5" /> Guardar Tarea
           </Button>
         </div>

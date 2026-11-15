@@ -56,6 +56,7 @@ type Options = {
   activeTool: WhiteboardTool
   activeShapeKind: WhiteboardShapeKind
   selectedItemId: string | null
+  readOnly?: boolean
   onSelectItem: (id: string | null) => void
   onSelectTool: (tool: WhiteboardTool) => void
   onPanChange: (next: { x: number; y: number }, commit: boolean) => void
@@ -77,6 +78,7 @@ export function useWhiteboardInteractions(opts: Options) {
     activeTool,
     activeShapeKind,
     selectedItemId,
+    readOnly = false,
     onSelectItem,
     onSelectTool,
     onPanChange,
@@ -98,6 +100,7 @@ export function useWhiteboardInteractions(opts: Options) {
 
   useWhiteboardShortcuts({
     selectedItemId,
+    readOnly,
     onSpaceChange: setIsSpaceHeld,
     onSelectItem,
     onSelectTool,
@@ -121,6 +124,11 @@ export function useWhiteboardInteractions(opts: Options) {
   const onItemMouseDown = useCallback(
     (e: React.MouseEvent, item: TeamWhiteboardItem) => {
       if (e.button === 1 || isSpaceHeld || activeTool === 'pan') {
+        return
+      }
+      if (readOnly) {
+        e.stopPropagation()
+        onSelectItem(item.id)
         return
       }
       if (activeTool === 'draw' || activeTool === 'arrow' || activeTool === 'shape') {
@@ -150,11 +158,14 @@ export function useWhiteboardInteractions(opts: Options) {
         height: item.height
       })
     },
-    [activeTool, isSpaceHeld, onSelectItem]
+    [activeTool, isSpaceHeld, onSelectItem, readOnly]
   )
 
   const onResizeMouseDown = useCallback(
     (e: React.MouseEvent, item: TeamWhiteboardItem) => {
+      if (readOnly) {
+        return
+      }
       e.stopPropagation()
       onSelectItem(item.id)
       sessionRef.current = {
@@ -175,7 +186,7 @@ export function useWhiteboardInteractions(opts: Options) {
         height: item.height
       })
     },
-    [onSelectItem]
+    [onSelectItem, readOnly]
   )
 
   const onCanvasMouseDown = useCallback(
@@ -193,20 +204,20 @@ export function useWhiteboardInteractions(opts: Options) {
         }
         return
       }
-      if (activeTool === 'draw') {
+      if (!readOnly && activeTool === 'draw') {
         e.stopPropagation()
         sessionRef.current = { kind: 'draw', points: [worldPt] }
         setDrawingPreview({ kind: 'draw', points: [worldPt] })
         return
       }
-      if (activeTool === 'arrow') {
+      if (!readOnly && activeTool === 'arrow') {
         e.stopPropagation()
         const fromId = findSnapTargetId(worldPt, items)
         sessionRef.current = { kind: 'arrow', start: worldPt, fromId }
         setDrawingPreview({ kind: 'arrow', start: worldPt, end: worldPt, snapTargetId: fromId })
         return
       }
-      if (activeTool === 'shape') {
+      if (!readOnly && activeTool === 'shape') {
         e.stopPropagation()
         sessionRef.current = { kind: 'shape', shapeKind: activeShapeKind, start: worldPt }
         setDrawingPreview({
@@ -233,7 +244,7 @@ export function useWhiteboardInteractions(opts: Options) {
         moved: false
       }
     },
-    [activeShapeKind, activeTool, isSpaceHeld, items, onSelectItem, pan.x, pan.y, toWorld]
+    [activeShapeKind, activeTool, isSpaceHeld, items, onSelectItem, pan.x, pan.y, readOnly, toWorld]
   )
 
   const onCanvasMouseMove = useCallback(

@@ -10,6 +10,7 @@ import { copyTextToClipboard } from '../utils/team-clipboard'
 type Props = {
   teamName: string
   invitations: TeamInvitation[]
+  canManageMembers?: boolean
   onResend: (invitationId: string) => Promise<void>
   onRevoke: (invitationId: string) => Promise<void>
 }
@@ -26,6 +27,7 @@ export function buildInvitationMailtoHref(teamName: string, invitation: TeamInvi
 export function TeamPendingInvitationsList({
   teamName,
   invitations,
+  canManageMembers = true,
   onResend,
   onRevoke
 }: Props): React.JSX.Element | null {
@@ -72,8 +74,17 @@ export function TeamPendingInvitationsList({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                title="Reenviar por email"
-                onClick={() => void onResend(inv.id)}
+                disabled={!canManageMembers}
+                title={
+                  canManageMembers
+                    ? 'Reenviar por email'
+                    : 'Permisos insuficientes para reenviar invitaciones'
+                }
+                onClick={() => {
+                  if (canManageMembers) {
+                    void onResend(inv.id)
+                  }
+                }}
               >
                 <RefreshCw className="w-3 h-3" />
               </Button>
@@ -97,8 +108,17 @@ export function TeamPendingInvitationsList({
                 type="button"
                 variant="destructive-chip"
                 size="icon-xs"
-                title="Revocar invitación"
-                onClick={() => void onRevoke(inv.id)}
+                disabled={!canManageMembers}
+                title={
+                  canManageMembers
+                    ? 'Revocar invitación'
+                    : 'Permisos insuficientes para revocar invitaciones'
+                }
+                onClick={() => {
+                  if (canManageMembers) {
+                    void onRevoke(inv.id)
+                  }
+                }}
               >
                 <Trash2 className="w-3 h-3" />
               </Button>

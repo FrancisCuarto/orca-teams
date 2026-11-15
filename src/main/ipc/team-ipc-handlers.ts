@@ -8,9 +8,14 @@ import type {
   TeamSendInvitationResult,
   TeamStartExecutionRequest
 } from '../../shared/teamwork/team-ipc-types'
+import {
+  canAccessProject,
+  getTeamPermissions
+} from '../../shared/teamwork/team-rbac-policy'
 import type {
   AgentExecutionRecord,
-  TeamActivityEntry
+  TeamActivityEntry,
+  TeamRole
 } from '../../shared/teamwork/team-workspace-types'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import type { CodexAccountService } from '../codex-accounts/service'
@@ -81,6 +86,44 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     return proj?.teamId ?? snapshot.teams[0]?.id ?? 'team-local'
   }
 
+  const resolveActorUserId = async (explicitActorId?: string): Promise<string> => {
+    const trimmed = explicitActorId?.trim()
+    if (trimmed) {
+      return trimmed
+    }
+    const currentUser = await authService.getCurrentUser()
+    return currentUser.userId
+  }
+
+  const requireTeamRole = (teamId: string, actorUserId: string): TeamRole => {
+    const role = db.getTeamMemberRole(teamId, actorUserId)
+    if (!role) {
+      throw new Error('Acceso denegado: el usuario no es miembro de este equipo')
+    }
+    return role
+  }
+
+  const requireProjectPermission = (
+    projectId: string,
+    actorUserId: string,
+    permission: 'canDispatchAgents' | 'canApproveExecutions',
+    errorMessage: string
+  ): void => {
+    const project = projectId ? db.getProject(projectId) : null
+    const teamId = project?.teamId ?? resolveTeamIdForProject(projectId)
+    const role = requireTeamRole(teamId, actorUserId)
+    const permissions = getTeamPermissions(role)
+    if (!permissions[permission]) {
+      throw new Error(errorMessage)
+    }
+    if (project) {
+      const isExplicit = db.isExplicitProjectMember(project.id, actorUserId)
+      if (!canAccessProject(project, role, isExplicit)) {
+        throw new Error('Acceso denegado: no tienes visibilidad sobre este proyecto privado')
+      }
+    }
+  }
+
   const runner = new TeamAgentRunner({
     getFallbackHomeDir: () => app.getPath('home'),
     onPersistExecution: (record) => db.upsertExecution(record),
@@ -124,12 +167,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
   )
 
   ipcMain.handle('team:startExecution', async (_event, request: TeamStartExecutionRequest) => {
-    const record = await runner.startExecution(request, broadcastExecutionEvent)
+    const actorUserId = await resolveActorUserId(request.actorUserId)
+    requireProjectPermission(
+      request.projectId,
+      actorUserId,
+      'canDispatchAgents',
+      'Permisos insuficientes: tu rol no permite despachar agentes'
+    )
+    const record = await runner.startExecution(
+      { ...request, actorUserId },
+      broadcastExecutionEvent
+    )
     recordSystemActivity({
       teamId: resolveTeamIdForProject(request.projectId),
       projectId: request.projectId,
-      actorId: request.actorUserId,
-      actorName: request.actorUserId,
+      actorId: actorUserId,
+      actorName: actorUserId,
       actorType: 'human',
       action: 'execution.started',
       targetType: 'card',
@@ -144,14 +197,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
   )
 
   ipcMain.handle('team:approveExecution', async (_event, request: TeamApproveExecutionRequest) => {
-    const updated = await runner.approveExecution(request)
+    const existing = runner.getExecution(request.executionId)
+    const actorUserId = await resolveActorUserId(request.actorUserId)
+    requireProjectPermission(
+      existing?.projectId ?? '',
+      actorUserId,
+      'canApproveExecutions',
+      'Permisos insuficientes: tu rol no permite aprobar ejecuciones'
+    )
+    const updated = await runner.approveExecution({ ...request, actorUserId })
     if (updated) {
       broadcastExecutionEvent({ type: 'updated', execution: updated })
       recordSystemActivity({
         teamId: resolveTeamIdForProject(updated.projectId),
         projectId: updated.projectId,
-        actorId: request.actorUserId ?? 'local-owner',
-        actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+        actorId: actorUserId,
+        actorName: request.actorName ?? actorUserId,
         actorType: 'human',
         action: 'execution.approved',
         targetType: 'execution',
@@ -165,14 +226,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
   })
 
   ipcMain.handle('team:rejectExecution', async (_event, request: TeamRejectExecutionRequest) => {
-    const updated = await runner.rejectExecution(request)
+    const existing = runner.getExecution(request.executionId)
+    const actorUserId = await resolveActorUserId(request.actorUserId)
+    requireProjectPermission(
+      existing?.projectId ?? '',
+      actorUserId,
+      'canApproveExecutions',
+      'Permisos insuficientes: tu rol no permite rechazar ejecuciones'
+    )
+    const updated = await runner.rejectExecution({ ...request, actorUserId })
     if (updated) {
       broadcastExecutionEvent({ type: 'updated', execution: updated })
       recordSystemActivity({
         teamId: resolveTeamIdForProject(updated.projectId),
         projectId: updated.projectId,
-        actorId: request.actorUserId ?? 'local-owner',
-        actorName: request.actorName ?? request.actorUserId ?? 'Equipo',
+        actorId: actorUserId,
+        actorName: request.actorName ?? actorUserId,
         actorType: 'human',
         action: 'execution.rejected',
         targetType: 'execution',
@@ -208,26 +277,39 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     return team
   })
 
-  ipcMain.handle('team:createProject', (_event, input: Parameters<TeamApi['createProject']>[0]) => {
-    const project = db.createProject(input)
-    recordSystemActivity({
-      teamId: project.teamId,
-      projectId: project.id,
-      actorId: input.actorUserId ?? 'local-owner',
-      actorName: input.actorUserId ?? 'Equipo',
-      actorType: 'human',
-      action: 'project.created',
-      targetType: 'project',
-      targetId: project.id,
-      summary: `Creó el proyecto "${project.name}" (${project.visibility})`
-    })
-    return project
-  })
+  ipcMain.handle(
+    'team:createProject',
+    async (_event, input: Parameters<TeamApi['createProject']>[0]) => {
+      const actorUserId = await resolveActorUserId(input.actorUserId)
+      const role = requireTeamRole(input.teamId, actorUserId)
+      if (!getTeamPermissions(role).canCreateProject) {
+        throw new Error('Permisos insuficientes: tu rol no permite crear proyectos')
+      }
+      const project = db.createProject({ ...input, actorUserId })
+      recordSystemActivity({
+        teamId: project.teamId,
+        projectId: project.id,
+        actorId: actorUserId,
+        actorName: actorUserId,
+        actorType: 'human',
+        action: 'project.created',
+        targetType: 'project',
+        targetId: project.id,
+        summary: `Creó el proyecto "${project.name}" (${project.visibility})`
+      })
+      return project
+    }
+  )
 
   ipcMain.handle(
     'team:sendInvitation',
     async (_event, request: TeamSendInvitationRequest): Promise<TeamSendInvitationResult> => {
-      const invitation = db.createAndPersistInvitation(request)
+      const actorUserId = await resolveActorUserId(request.invitedBy)
+      const role = requireTeamRole(request.teamId, actorUserId)
+      if (!getTeamPermissions(role).canManageMembers) {
+        throw new Error('Permisos insuficientes: se requiere rol admin u owner para invitar')
+      }
+      const invitation = db.createAndPersistInvitation({ ...request, invitedBy: actorUserId })
       const joinUrl = buildJoinUrl(invitation.token)
       const mail = await emailService.sendInvitationEmail({
         toEmail: invitation.email,
@@ -239,8 +321,8 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
       })
       recordSystemActivity({
         teamId: request.teamId,
-        actorId: request.invitedBy,
-        actorName: request.inviterName ?? request.invitedBy,
+        actorId: actorUserId,
+        actorName: request.inviterName ?? actorUserId,
         actorType: 'human',
         action: 'invitation.sent',
         targetType: 'invitation',
@@ -311,8 +393,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     }
   )
 
-  ipcMain.handle('team:revokeInvitation', (_event, invitationId: string, actorUserId: string) =>
-    db.revokeInvitation(invitationId, actorUserId)
+  ipcMain.handle(
+    'team:revokeInvitation',
+    async (_event, invitationId: string, actorUserId: string) => {
+      const invitation = db.getInvitationById(invitationId)
+      if (!invitation) {
+        throw new Error('Invitación no encontrada')
+      }
+      const resolvedActorId = await resolveActorUserId(actorUserId)
+      const role = requireTeamRole(invitation.teamId, resolvedActorId)
+      if (!getTeamPermissions(role).canManageMembers) {
+        throw new Error(
+          'Permisos insuficientes: se requiere rol admin u owner para revocar invitaciones'
+        )
+      }
+      db.revokeInvitation(invitationId, resolvedActorId)
+    }
   )
 
   registerTeamAuthSyncAndMailHandlers({ db, emailService, authService, syncServer })

@@ -6,6 +6,11 @@ import type {
   TeamKanbanBoard,
   TeamKanbanCard
 } from '../../../../../shared/teamwork/team-kanban-types'
+import {
+  getTeamPermissions,
+  type TeamPermissions
+} from '../../../../../shared/teamwork/team-rbac-policy'
+import type { TeamRole } from '../../../../../shared/teamwork/team-workspace-types'
 import { useInstalledConfiguredAgents } from '../hooks/use-installed-configured-agents'
 import { useTeamAgentExecutions } from '../hooks/use-team-agent-executions'
 import { computeBoardSprintMetrics } from './team-kanban-board-mutations'
@@ -26,6 +31,8 @@ type Props = {
   projectPath?: string | null
   currentUserId?: string
   currentUserName?: string
+  userRole?: TeamRole
+  permissions?: TeamPermissions
   humanMembers?: ExtendedTeamMember[]
   onChange: (updatedBoard: TeamKanbanBoard) => void
 }
@@ -36,9 +43,15 @@ export function TeamKanbanBoardView({
   projectPath,
   currentUserId = 'usr-francis',
   currentUserName,
+  userRole = 'owner',
+  permissions,
   humanMembers,
   onChange
 }: Props): React.JSX.Element {
+  const resolvedPermissions = permissions ?? getTeamPermissions(userRole)
+  const { canEditBoard, canDispatchAgents, canApproveExecutions } = resolvedPermissions
+  const isReadOnly = !canEditBoard
+
   const [editingCard, setEditingCard] = useState<TeamKanbanCard | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined)
@@ -69,6 +82,8 @@ export function TeamKanbanBoardView({
     projectId: projectId ?? board.projectId ?? 'proj-default',
     projectPath,
     actorUserId: currentUserId,
+    canEditBoard,
+    canDispatchAgents,
     configuredAgents,
     executionsByCard,
     startCardExecution,
@@ -79,6 +94,7 @@ export function TeamKanbanBoardView({
 
   const dnd = useKanbanDragHandlers({
     board,
+    disabled: isReadOnly,
     onAssignDraggedMember: actions.handleAssignDraggedMember,
     onChange
   })
@@ -91,11 +107,14 @@ export function TeamKanbanBoardView({
 
   const handleOpenNewCard = useCallback(
     (colId?: string) => {
+      if (!canEditBoard) {
+        return
+      }
       setEditingCard(null)
       setTargetColumnId(colId ?? board.columns[0]?.id)
       setIsModalOpen(true)
     },
-    [board.columns]
+    [board.columns, canEditBoard]
   )
 
   const handleEditCard = useCallback((card: TeamKanbanCard) => {
@@ -106,11 +125,14 @@ export function TeamKanbanBoardView({
 
   const handleAddColumn = useCallback(
     (title: string): void => {
+      if (!canEditBoard) {
+        return
+      }
       const newCol = { id: `col-${Date.now()}`, title, cardIds: [] }
       onChange({ ...board, columns: [...board.columns, newCol], updatedAt: Date.now() })
       toast.success(`Columna "${newCol.title}" creada`)
     },
-    [board, onChange]
+    [board, canEditBoard, onChange]
   )
 
   return (
@@ -122,6 +144,7 @@ export function TeamKanbanBoardView({
         statusFilter={filters.statusFilter}
         filteredCount={filters.filteredCards.length}
         filteredPoints={filters.filteredPoints}
+        canCreateTask={canEditBoard}
         onSearchChange={filters.setSearchQuery}
         onPriorityChange={filters.setSelectedPriority}
         onStatusFilterChange={filters.setStatusFilter}
@@ -131,6 +154,7 @@ export function TeamKanbanBoardView({
       <TeamKanbanSprintHeader
         sprintGoal={board.sprintGoal}
         metrics={metrics}
+        canEdit={canEditBoard}
         onSaveSprintGoal={actions.handleSaveSprintGoal}
       />
 
@@ -146,6 +170,8 @@ export function TeamKanbanBoardView({
             columns={board.columns}
             columnCardsMap={filters.columnCardsMap}
             cardStatuses={cardStatuses}
+            isReadOnly={isReadOnly}
+            canDispatchAgents={canDispatchAgents}
             onAddCard={handleOpenNewCard}
             onDeleteColumn={actions.handleDeleteColumn}
             onEditCard={handleEditCard}
@@ -163,9 +189,10 @@ export function TeamKanbanBoardView({
             humanMembers={humanMembers}
             customMembers={board.customMembers}
             agentsLoading={agentsLoading}
+            isReadOnly={isReadOnly}
             onRefreshAgents={() => void refreshAgents()}
             onFilterChange={filters.setSelectedFilterMember}
-            onAddCustomMember={actions.handleAddCustomMember}
+            onAddCustomMember={canEditBoard ? actions.handleAddCustomMember : undefined}
           />
         </div>
         <TeamKanbanDragOverlay activeCard={activeCard} activeAssignee={dnd.activeAssignee} />
@@ -179,6 +206,8 @@ export function TeamKanbanBoardView({
         configuredAgents={configuredAgents}
         humanMembers={humanMembers}
         availableMembers={board.customMembers}
+        readOnly={isReadOnly}
+        canDispatchAgents={canDispatchAgents}
         onClose={() => setIsModalOpen(false)}
         onSave={actions.handleSaveCard}
         onDelete={actions.handleDeleteCard}
@@ -188,30 +217,40 @@ export function TeamKanbanBoardView({
         open={Boolean(executionModalCardId && activeExecution)}
         cardTitle={executionModalCard?.title ?? 'Tarea'}
         execution={activeExecution}
+        canApproveExecutions={canApproveExecutions}
+        canDispatchAgents={canDispatchAgents}
         onOpenChange={(open) => {
           if (!open) {
             setExecutionModalCardId(null)
           }
         }}
-        onCancel={(executionId) => void cancelExecution(executionId)}
-        onApprove={(executionId, mergeToBase) =>
-          void approveExecution({
-            executionId,
-            mergeToBase,
-            actorUserId: currentUserId,
-            actorName: currentUserName
-          })
-        }
-        onReject={(executionId, discardWorktree) =>
-          void rejectExecution({
-            executionId,
-            discardWorktree,
-            actorUserId: currentUserId,
-            actorName: currentUserName
-          })
-        }
+        onCancel={(executionId) => {
+          if (canDispatchAgents) {
+            void cancelExecution(executionId)
+          }
+        }}
+        onApprove={(executionId, mergeToBase) => {
+          if (canApproveExecutions) {
+            void approveExecution({
+              executionId,
+              mergeToBase,
+              actorUserId: currentUserId,
+              actorName: currentUserName
+            })
+          }
+        }}
+        onReject={(executionId, discardWorktree) => {
+          if (canApproveExecutions) {
+            void rejectExecution({
+              executionId,
+              discardWorktree,
+              actorUserId: currentUserId,
+              actorName: currentUserName
+            })
+          }
+        }}
         onRerun={
-          executionModalCard
+          executionModalCard && canDispatchAgents
             ? () => void actions.triggerImmediateExecution(executionModalCard)
             : undefined
         }

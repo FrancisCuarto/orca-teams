@@ -11,6 +11,7 @@ type Props = {
   statusFilter: 'all' | 'blocked' | 'agents'
   filteredCount: number
   filteredPoints: number
+  canCreateTask?: boolean
   onSearchChange: (value: string) => void
   onPriorityChange: (value: string) => void
   onStatusFilterChange: (value: 'all' | 'blocked' | 'agents') => void
@@ -25,6 +26,7 @@ export function TeamKanbanToolbar({
   statusFilter,
   filteredCount,
   filteredPoints,
+  canCreateTask = true,
   onSearchChange,
   onPriorityChange,
   onStatusFilterChange,
@@ -118,7 +120,16 @@ export function TeamKanbanToolbar({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <Button size="sm" onClick={onCreateTask}>
+        <Button
+          size="sm"
+          disabled={!canCreateTask}
+          title={canCreateTask ? 'Crear nueva tarea' : 'Solo lectura: no puedes crear tareas'}
+          onClick={() => {
+            if (canCreateTask) {
+              onCreateTask()
+            }
+          }}
+        >
           <Plus className="size-3.5" />
           Nueva Tarea
         </Button>

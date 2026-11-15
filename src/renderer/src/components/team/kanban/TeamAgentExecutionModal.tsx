@@ -29,6 +29,8 @@ type Props = {
   open: boolean
   cardTitle: string
   execution: AgentExecutionRecord | null
+  canApproveExecutions?: boolean
+  canDispatchAgents?: boolean
   onOpenChange: (open: boolean) => void
   onCancel?: (executionId: string) => void
   onRerun?: () => void
@@ -40,6 +42,8 @@ export function TeamAgentExecutionModal({
   open,
   cardTitle,
   execution,
+  canApproveExecutions = true,
+  canDispatchAgents = true,
   onOpenChange,
   onCancel,
   onRerun,
@@ -167,13 +171,29 @@ export function TeamAgentExecutionModal({
 
           {needsApproval && (onApprove || onReject) && (
             <div className="rounded-lg border border-annotation-highlight/30 bg-annotation-highlight/10 p-3 space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                <ShieldCheck className="w-4 h-4 text-annotation-highlight" />
-                <span>Aprobación humana requerida antes de integrar cambios</span>
+              <div className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-annotation-highlight" />
+                  <span>Aprobación humana requerida antes de integrar cambios</span>
+                </span>
+                {!canApproveExecutions ? (
+                  <Badge variant="outline" className="text-3xs">
+                    Solo lectura
+                  </Badge>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {onApprove && execution.worktreePath && (
-                  <Button type="button" size="xs" onClick={() => onApprove(execution.id, true)}>
+                  <Button
+                    type="button"
+                    size="xs"
+                    disabled={!canApproveExecutions}
+                    onClick={() => {
+                      if (canApproveExecutions) {
+                        onApprove(execution.id, true)
+                      }
+                    }}
+                  >
                     <GitMerge className="w-3.5 h-3.5" />
                     Aprobar y Fusionar a {execution.baseBranch ?? 'rama base'}
                   </Button>
@@ -183,7 +203,12 @@ export function TeamAgentExecutionModal({
                     type="button"
                     size="xs"
                     variant="secondary"
-                    onClick={() => onApprove(execution.id, false)}
+                    disabled={!canApproveExecutions}
+                    onClick={() => {
+                      if (canApproveExecutions) {
+                        onApprove(execution.id, false)
+                      }
+                    }}
                   >
                     <Check className="w-3.5 h-3.5" />
                     Aprobar sin fusionar
@@ -194,7 +219,12 @@ export function TeamAgentExecutionModal({
                     type="button"
                     size="xs"
                     variant="destructive"
-                    onClick={() => onReject(execution.id, Boolean(execution.worktreePath))}
+                    disabled={!canApproveExecutions}
+                    onClick={() => {
+                      if (canApproveExecutions) {
+                        onReject(execution.id, Boolean(execution.worktreePath))
+                      }
+                    }}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     {execution.worktreePath ? 'Rechazar y Descartar Worktree' : 'Rechazar'}
@@ -280,14 +310,29 @@ export function TeamAgentExecutionModal({
               type="button"
               variant="destructive"
               size="sm"
-              onClick={() => onCancel(execution.id)}
+              disabled={!canDispatchAgents}
+              onClick={() => {
+                if (canDispatchAgents) {
+                  onCancel(execution.id)
+                }
+              }}
             >
               <StopCircle className="w-3.5 h-3.5 mr-1.5 inline" />
               Cancelar Ejecución
             </Button>
           )}
           {!isRunning && !needsApproval && onRerun && (
-            <Button type="button" variant="secondary" size="sm" onClick={onRerun}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!canDispatchAgents}
+              onClick={() => {
+                if (canDispatchAgents) {
+                  onRerun()
+                }
+              }}
+            >
               <RotateCcw className="w-3.5 h-3.5 mr-1.5 inline" />
               Re-ejecutar
             </Button>

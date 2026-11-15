@@ -155,4 +155,144 @@ describe('TeamSyncRelayServer', () => {
     await waitFor(() => crdtC.getBoard().cards['card-ws-1']?.title === 'Sincronizada por Relay')
     expect(crdtC.getBoard().cards['card-ws-1']?.priority).toBe('urgent')
   })
+
+  it('ignores sync-update from viewer sockets and rejects unauthorized private project joins', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'orca-relay-rbac-test-'))
+    const db = new TeamHostDatabase(path.join(dir, 'teams.db'))
+    const team = db.createTeam({ name: 'RBAC Team' })
+    const sharedProj = db.createProject({
+      teamId: team.id,
+      name: 'Shared Board Project',
+      visibility: 'team',
+      actorUserId: team.ownerId
+    })
+    const privateProj = db.createProject({
+      teamId: team.id,
+      name: 'Secret Project',
+      visibility: 'private',
+      actorUserId: team.ownerId
+    })
+    const inv = db.createAndPersistInvitation({
+      teamId: team.id,
+      teamName: team.name,
+      email: 'viewer@orca.run',
+      role: 'viewer',
+      invitedBy: team.ownerId
+    })
+    db.acceptInvitation(inv.token, 'usr-viewer', 'Viewer', 'viewer@orca.run')
+
+    const server = new TeamSyncRelayServer(db, dir)
+    cleanups.push(async () => {
+      await server.stopHosting()
+      db.close()
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    const rawUrl = await server.startHosting(0, 'secret-rbac')
+    const port = rawUrl.split(':').at(-1)
+    const wsUrl = `ws://127.0.0.1:${port}`
+    const roomId = `project:${sharedProj.id}:board:b-rbac`
+
+    const crdtOwner = new TeamBoardCRDT('b-rbac')
+    crdtOwner.initializeFromBoard({
+      id: 'b-rbac',
+      projectId: sharedProj.id,
+      title: 'RBAC Board',
+      columns: [{ id: 'col-1', title: 'Todo', cardIds: [] }],
+      cards: {},
+      createdAt: 1,
+      updatedAt: 1
+    })
+    const roomOwner = new TeamRoomProvider(
+      roomId,
+      crdtOwner,
+      team.ownerId,
+      new TeamWebSocketTransport({
+        url: wsUrl,
+        roomId,
+        userId: team.ownerId,
+        token: 'secret-rbac',
+        createSocket: createNodeSocket
+      })
+    )
+
+    const crdtViewer = new TeamBoardCRDT('b-rbac')
+    const roomViewer = new TeamRoomProvider(
+      roomId,
+      crdtViewer,
+      'usr-viewer',
+      new TeamWebSocketTransport({
+        url: wsUrl,
+        roomId,
+        userId: 'usr-viewer',
+        token: 'secret-rbac',
+        createSocket: createNodeSocket
+      })
+    )
+    cleanups.push(() => {
+      roomOwner.destroy()
+      crdtOwner.destroy()
+      roomViewer.destroy()
+      crdtViewer.destroy()
+    })
+
+    await waitFor(
+      () => roomOwner.getStatus() === 'connected' && roomViewer.getStatus() === 'connected'
+    )
+
+    // Viewer attempts a local write; relay must drop it so owner never receives it.
+    crdtViewer.upsertCard({
+      id: 'card-viewer-blocked',
+      title: 'Unauthorized Viewer Edit',
+      description: 'Should be rejected',
+      columnId: 'col-1',
+      priority: 'low',
+      labels: [],
+      checklist: [],
+      createdAt: 2,
+      updatedAt: 2
+    })
+
+    // Owner performs a valid write; viewer should still receive owner updates.
+    crdtOwner.upsertCard({
+      id: 'card-owner-allowed',
+      title: 'Allowed Owner Edit',
+      description: 'Should sync to viewer',
+      columnId: 'col-1',
+      priority: 'high',
+      labels: [],
+      checklist: [],
+      createdAt: 3,
+      updatedAt: 3
+    })
+
+    await waitFor(() => crdtViewer.getBoard().cards['card-owner-allowed'] !== undefined)
+    expect(crdtOwner.getBoard().cards['card-viewer-blocked']).toBeUndefined()
+
+    // Non-invited user trying to join a private project room should be closed with 4003.
+    const privateRoomId = `project:${privateProj.id}:board:b-priv`
+    const closedCode = await new Promise<number>((resolve, reject) => {
+      const ws = new WebSocket(wsUrl)
+      const timer = setTimeout(() => reject(new Error('Timed out waiting for 4003 close')), 3000)
+      ws.on('open', () => {
+        ws.send(
+          JSON.stringify({
+            type: 'join',
+            roomId: privateRoomId,
+            userId: 'usr-viewer',
+            token: 'secret-rbac'
+          })
+        )
+      })
+      ws.on('close', (code) => {
+        clearTimeout(timer)
+        resolve(code)
+      })
+      ws.on('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+    })
+    expect(closedCode).toBe(4003)
+  })
 })

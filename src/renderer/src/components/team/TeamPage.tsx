@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react'
-import { Activity, FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
+import { Activity, Eye, FileText, Kanban, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
 import type { TeamRole } from '../../../../shared/teamwork/team-workspace-types'
@@ -12,6 +12,7 @@ import { TeamKanbanConnectedView } from './kanban/TeamKanbanConnectedView'
 import { TeamWhiteboardConnectedView } from './whiteboard/TeamWhiteboardConnectedView'
 import { TeamNotesConnectedView } from './notes/TeamNotesConnectedView'
 import { TeamProjectSelector } from './workspace/TeamProjectSelector'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
@@ -31,9 +32,11 @@ export default function TeamPage(): React.JSX.Element {
     activeWorktreePath: activeWorktree?.path,
     activeRepoId: activeRepo?.id,
     activeRepoPath: activeRepo?.path,
-    activeRepoDisplayName: activeRepo?.displayName
+    activeRepoDisplayName: activeRepo?.displayName,
+    currentUserId: syncAndAuth.user.userId
   })
 
+  const permissions = registry.permissions
   const activeProjectId = registry.currentProject?.id ?? 'proj-default'
 
   const {
@@ -79,6 +82,10 @@ export default function TeamPage(): React.JSX.Element {
 
   const handleExtractTasksToKanban = useCallback(
     (noteTitle: string, content: string) => {
+      if (!permissions.canEditBoard) {
+        toast.error('Modo solo lectura: no tienes permisos para modificar el tablero')
+        return
+      }
       if (!board) {
         return
       }
@@ -98,7 +105,7 @@ export default function TeamPage(): React.JSX.Element {
         { description: `Origen: ${noteTitle}` }
       )
     },
-    [board, handleBoardChange]
+    [board, handleBoardChange, permissions.canEditBoard]
   )
 
   return (
@@ -112,6 +119,8 @@ export default function TeamPage(): React.JSX.Element {
         pendingInvitations={registry.activePendingInvitations}
         mailConfig={registry.mailConfig}
         userRole={registry.userRole}
+        permissions={permissions}
+        projectMembersByProject={registry.projectMembersByProject}
         currentUser={syncAndAuth.user}
         syncStatus={syncAndAuth.syncStatus}
         onSelectTeam={registry.setActiveTeamId}
@@ -167,7 +176,17 @@ export default function TeamPage(): React.JSX.Element {
         </div>
 
         <div className="flex items-center gap-2">
-          {boardMetrics && (
+          {permissions.isReadOnly ? (
+            <Badge
+              variant="outline"
+              data-testid="team-readonly-badge"
+              className="text-3xs gap-1 border-amber-500/40 text-amber-500 bg-amber-500/10"
+            >
+              <Eye className="w-3 h-3" />
+              Solo lectura (Viewer)
+            </Badge>
+          ) : null}
+          {boardMetrics && registry.currentProject && (
             <span className="text-2xs text-muted-foreground mr-1">
               {boardMetrics.completedCards}/{boardMetrics.totalCards} tareas ·{' '}
               {notes?.notes.length ?? 0} docs
@@ -186,7 +205,15 @@ export default function TeamPage(): React.JSX.Element {
       </header>
 
       <main className="flex flex-1 min-h-0 overflow-hidden">
-        {loading ? (
+        {!registry.currentProject ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
+            <Lock className="size-6 text-amber-500" />
+            <p className="text-sm font-medium text-foreground">No hay proyectos visibles</p>
+            <p className="text-xs max-w-sm">
+              Los proyectos privados de este equipo requieren invitación explícita o rol admin/owner.
+            </p>
+          </div>
+        ) : loading ? (
           <div className="flex flex-1 items-center justify-center">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
@@ -197,6 +224,8 @@ export default function TeamPage(): React.JSX.Element {
             projectPath={projectPath}
             initialBoard={board}
             currentUser={{ ...currentUserIdentity, color: '#3b82f6' }}
+            userRole={registry.userRole}
+            permissions={permissions}
             humanMembers={registry.humanMembers}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
@@ -209,6 +238,8 @@ export default function TeamPage(): React.JSX.Element {
             projectId={activeProjectId}
             initialWhiteboard={whiteboard}
             currentUser={{ ...currentUserIdentity, color: '#10b981' }}
+            userRole={registry.userRole}
+            permissions={permissions}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleWhiteboardChange}
@@ -219,6 +250,8 @@ export default function TeamPage(): React.JSX.Element {
             projectId={activeProjectId}
             initialNotes={notes}
             currentUser={{ ...currentUserIdentity, color: '#8b5cf6' }}
+            userRole={registry.userRole}
+            permissions={permissions}
             relayUrl={syncAndAuth.effectiveRelayUrl}
             syncToken={syncAndAuth.syncToken}
             onPersist={handleNotesChange}
