@@ -10,7 +10,8 @@ import type {
   Project,
   Team,
   TeamInvitation,
-  TeamRole
+  TeamRole,
+  TeamUserProfile
 } from '../../../../../shared/teamwork/team-workspace-types'
 import type { ExtendedTeamMember } from '../../../../../shared/teamwork/team-kanban-types'
 import {
@@ -32,6 +33,7 @@ export function useTeamWorkspaceRegistry(options: {
   activeRepoId?: string
   activeRepoPath?: string | null
   activeRepoDisplayName?: string
+  currentUser?: TeamUserProfile
 }) {
   const defaultTeam: Team = useMemo(
     () => ({
@@ -251,16 +253,27 @@ export function useTeamWorkspaceRegistry(options: {
 
   const handleAcceptInvitation = useCallback(
     async (token: string, displayName?: string, email?: string): Promise<TeamMemberWithProfile> => {
+      const targetUserId = options.currentUser?.userId ?? currentUserId
+      const targetName = displayName || options.currentUser?.displayName || currentUserName
+      const targetEmail = email || options.currentUser?.email || currentUserMember?.email
       const member = await acceptTeamInvitationAction(
         token,
-        currentUserId,
-        displayName || currentUserName,
-        email || currentUserMember?.email
+        targetUserId,
+        targetName,
+        targetEmail
       )
       await loadWorkspace()
       return member
     },
-    [currentUserId, currentUserName, currentUserMember?.email, loadWorkspace]
+    [
+      options.currentUser?.userId,
+      options.currentUser?.displayName,
+      options.currentUser?.email,
+      currentUserId,
+      currentUserName,
+      currentUserMember?.email,
+      loadWorkspace
+    ]
   )
 
   const handleSaveMailConfig = useCallback(

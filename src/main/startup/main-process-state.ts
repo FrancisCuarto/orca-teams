@@ -40,6 +40,7 @@ import type { ServeOptions } from './main-process-serve'
 import type { HangDetectionMarker } from '../hang-watchdog/hang-detection-marker'
 import { ServeReadinessPublisher } from '../server/serve-readiness'
 import { PluginInstallLinkState, SkillShareDeepLinkState } from './skill-share-deep-link-state'
+import { TeamDeepLinkJoinState } from '../teamwork/team-deep-link'
 import { OsOpenedDocumentState } from './os-opened-documents'
 import {
   DEFAULT_GPU_CRASH_FALLBACK_THRESHOLD,
@@ -133,6 +134,7 @@ export const mainProcessState = {
   pendingQuitAndStopAllSessions: createWebContentsTimedFlag(),
   skillShareDeepLinks: new SkillShareDeepLinkState(),
   pluginInstallLinks: new PluginInstallLinkState(),
+  teamJoinDeepLinks: new TeamDeepLinkJoinState(),
   // Buffer OS Open With before any renderer listener exists.
   osOpenedDocuments: new OsOpenedDocumentState(),
   // Window existence does not prove listener readiness; only the renderer pull does, otherwise pushes silently vanish.

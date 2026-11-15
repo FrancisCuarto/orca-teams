@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
@@ -21,9 +22,12 @@ import type { CodexAccountService } from '../codex-accounts/service'
 import { listConfiguredTeamAgents } from '../teamwork/team-agent-discovery'
 import { TeamAgentRunner } from '../teamwork/team-agent-runner'
 import { TeamAuthService } from '../teamwork/team-auth-service'
+import { buildTeamJoinUrl } from '../teamwork/team-deep-link'
 import { TeamEmailService } from '../teamwork/team-email-service'
 import { TeamFactoryRunner } from '../teamwork/team-factory-runner'
 import { TeamHostDatabase } from '../teamwork/team-host-database'
+import { slugify } from '../teamwork/team-host-database-queries'
+import { TeamRelayHttpClient } from '../teamwork/team-relay-http-client'
 import { TeamSyncRelayServer } from '../teamwork/team-sync-relay-server'
 import { registerTeamAuthSyncAndMailHandlers } from './team-workspace-ipc'
 
@@ -49,7 +53,7 @@ function broadcastFactoryEvent(event: TeamFactoryEvent): void {
 }
 
 function buildJoinUrl(token: string): string {
-  return `orca://team/join?token=${encodeURIComponent(token)}`
+  return buildTeamJoinUrl(token)
 }
 
 function notifyExecutionOutcome(record: AgentExecutionRecord): void {
@@ -78,7 +82,18 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
   const db = new TeamHostDatabase()
   const emailService = new TeamEmailService()
   const authService = new TeamAuthService(db, emailService)
-  const syncServer = new TeamSyncRelayServer(db)
+  const syncServer = new TeamSyncRelayServer(db, { authService, emailService })
+
+  const getRemoteRelayClient = async (): Promise<TeamRelayHttpClient | null> => {
+    const settings = await syncServer.loadSettings()
+    if (settings.mode === 'remote' && settings.relayUrl.trim()) {
+      return new TeamRelayHttpClient({
+        relayUrl: settings.relayUrl,
+        roomSecret: settings.roomSecret
+      })
+    }
+    return null
+  }
 
   const recordSystemActivity = (entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>): void => {
     try {
@@ -241,9 +256,19 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     factoryRunner.listRuns(projectId)
   )
 
-  ipcMain.handle('team:getWorkspaceSnapshot', () => db.getWorkspaceSnapshot())
+  ipcMain.handle('team:getWorkspaceSnapshot', async () => {
+    const remote = await getRemoteRelayClient()
+    if (remote) {
+      return remote.getWorkspaceSnapshot()
+    }
+    return db.getWorkspaceSnapshot()
+  })
 
-  ipcMain.handle('team:createTeam', (_event, input: Parameters<TeamApi['createTeam']>[0]) => {
+  ipcMain.handle('team:createTeam', async (_event, input: Parameters<TeamApi['createTeam']>[0]) => {
+    const remote = await getRemoteRelayClient()
+    if (remote) {
+      return remote.createTeam(input)
+    }
     const team = db.createTeam(input)
     recordSystemActivity({
       teamId: team.id,
@@ -258,25 +283,36 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     return team
   })
 
-  ipcMain.handle('team:createProject', (_event, input: Parameters<TeamApi['createProject']>[0]) => {
-    const project = db.createProject(input)
-    recordSystemActivity({
-      teamId: project.teamId,
-      projectId: project.id,
-      actorId: input.actorUserId ?? 'local-owner',
-      actorName: input.actorUserId ?? 'Equipo',
-      actorType: 'human',
-      action: 'project.created',
-      targetType: 'project',
-      targetId: project.id,
-      summary: `Creó el proyecto "${project.name}" (${project.visibility})`
-    })
-    return project
-  })
+  ipcMain.handle(
+    'team:createProject',
+    async (_event, input: Parameters<TeamApi['createProject']>[0]) => {
+      const remote = await getRemoteRelayClient()
+      if (remote) {
+        return remote.createProject(input)
+      }
+      const project = db.createProject(input)
+      recordSystemActivity({
+        teamId: project.teamId,
+        projectId: project.id,
+        actorId: input.actorUserId ?? 'local-owner',
+        actorName: input.actorUserId ?? 'Equipo',
+        actorType: 'human',
+        action: 'project.created',
+        targetType: 'project',
+        targetId: project.id,
+        summary: `Creó el proyecto "${project.name}" (${project.visibility})`
+      })
+      return project
+    }
+  )
 
   ipcMain.handle(
     'team:sendInvitation',
     async (_event, request: TeamSendInvitationRequest): Promise<TeamSendInvitationResult> => {
+      const remote = await getRemoteRelayClient()
+      if (remote) {
+        return remote.sendInvitation(request)
+      }
       const invitation = db.createAndPersistInvitation(request)
       const joinUrl = buildJoinUrl(invitation.token)
       const mail = await emailService.sendInvitationEmail({
@@ -315,6 +351,10 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
       invitationId: string,
       inviterName?: string
     ): Promise<TeamSendInvitationResult> => {
+      const remote = await getRemoteRelayClient()
+      if (remote) {
+        return remote.resendInvitation(invitationId, inviterName)
+      }
       const invitation = db.getInvitationById(invitationId)
       if (!invitation) {
         throw new Error('Invitación no encontrada')
@@ -345,7 +385,33 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
 
   ipcMain.handle(
     'team:acceptInvitation',
-    (_event, token: string, userId: string, displayName?: string, email?: string) => {
+    async (_event, token: string, userId: string, displayName?: string, email?: string) => {
+      const remote = await getRemoteRelayClient()
+      if (remote) {
+        const currentUser = await authService.getCurrentUser()
+        let resolvedUserId =
+          userId.trim() && userId.trim() !== 'local-owner' ? userId.trim() : currentUser.userId
+        if (!resolvedUserId || resolvedUserId === 'local-owner') {
+          const hint = email?.split('@')[0] || displayName || randomUUID().slice(0, 8)
+          resolvedUserId = `usr-${slugify(hint, 'member')}-${randomUUID().slice(0, 4)}`
+        }
+        const member = await remote.acceptInvitation(
+          token,
+          resolvedUserId,
+          displayName || currentUser.displayName,
+          email || currentUser.email
+        )
+        if (currentUser.userId === 'local-owner') {
+          await authService.saveExternalVerifiedProfile({
+            userId: member.userId,
+            email: member.email || email || currentUser.email,
+            displayName: member.displayName || displayName || currentUser.displayName,
+            authMethod: currentUser.authMethod,
+            authenticatedAt: Date.now()
+          })
+        }
+        return member
+      }
       const member = db.acceptInvitation(token, userId, displayName, email)
       recordSystemActivity({
         teamId: member.teamId,
@@ -361,9 +427,22 @@ export function registerTeamHandlers(deps: TeamIpcDeps): void {
     }
   )
 
-  ipcMain.handle('team:revokeInvitation', (_event, invitationId: string, actorUserId: string) =>
-    db.revokeInvitation(invitationId, actorUserId)
+  ipcMain.handle(
+    'team:revokeInvitation',
+    async (_event, invitationId: string, actorUserId: string) => {
+      const remote = await getRemoteRelayClient()
+      if (remote) {
+        return remote.revokeInvitation(invitationId, actorUserId)
+      }
+      return db.revokeInvitation(invitationId, actorUserId)
+    }
   )
 
-  registerTeamAuthSyncAndMailHandlers({ db, emailService, authService, syncServer })
+  registerTeamAuthSyncAndMailHandlers({
+    db,
+    emailService,
+    authService,
+    syncServer,
+    getRemoteRelayClient
+  })
 }

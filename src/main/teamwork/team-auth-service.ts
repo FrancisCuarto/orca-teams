@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function hashAuthCode(email: string, code: string): string {
+export function hashAuthCode(email: string, code: string): string {
   return createHash('sha256').update(`${email.trim().toLowerCase()}:${code.trim()}`).digest('hex')
 }
 
@@ -130,6 +130,44 @@ export class TeamAuthService {
       authMethod: 'magic-link',
       authenticatedAt: Date.now()
     }
+    await this.persistProfile(profile)
+    this.db.upsertMemberProfile(profile.userId, profile.displayName, profile.email)
+    return profile
+  }
+
+  /**
+   * Verifies a magic-link challenge on behalf of a remote relay client without mutating
+   * the host machine's own `orca-team-user.json` profile file.
+   */
+  verifyRemoteChallenge(
+    email: string,
+    code: string,
+    displayName?: string,
+    preferredUserId?: string
+  ): TeamUserProfile {
+    const normalized = email.trim().toLowerCase()
+    const valid = this.db.consumeAuthChallenge(normalized, hashAuthCode(normalized, code))
+    if (!valid) {
+      throw new Error('Código inválido o expirado')
+    }
+    const cleanPreferred = preferredUserId?.trim()
+    const userId =
+      cleanPreferred && cleanPreferred !== 'local-owner'
+        ? cleanPreferred
+        : `usr-${slugify(normalized.split('@')[0] || 'member', 'user')}`
+    const resolvedName = displayName?.trim() || normalized.split('@')[0] || 'Member'
+    const profile: TeamUserProfile = {
+      userId,
+      email: normalized,
+      displayName: resolvedName,
+      authMethod: 'magic-link',
+      authenticatedAt: Date.now()
+    }
+    this.db.upsertMemberProfile(profile.userId, profile.displayName, profile.email)
+    return profile
+  }
+
+  async saveExternalVerifiedProfile(profile: TeamUserProfile): Promise<TeamUserProfile> {
     await this.persistProfile(profile)
     this.db.upsertMemberProfile(profile.userId, profile.displayName, profile.email)
     return profile

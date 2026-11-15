@@ -60,6 +60,8 @@ function installMockTeamApi(overrides: Partial<TeamApi>) {
     getLatestFactoryRunForCard: vi.fn(async () => null),
     listFactoryRuns: vi.fn(async () => []),
     onFactoryEvent: vi.fn(noopUnsub),
+    onDeepLinkJoin: vi.fn(noopUnsub),
+    consumePendingDeepLinkJoin: vi.fn(async () => null),
     getWorkspaceSnapshot: vi.fn(async () => ({
       teams: [],
       projects: [],

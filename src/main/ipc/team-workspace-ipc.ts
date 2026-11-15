@@ -6,6 +6,7 @@ import type {
 import type { TeamAuthService } from '../teamwork/team-auth-service'
 import type { TeamEmailService } from '../teamwork/team-email-service'
 import type { TeamHostDatabase } from '../teamwork/team-host-database'
+import type { TeamRelayHttpClient } from '../teamwork/team-relay-http-client'
 import type { TeamSyncRelayServer } from '../teamwork/team-sync-relay-server'
 
 export function registerTeamAuthSyncAndMailHandlers(deps: {
@@ -13,8 +14,9 @@ export function registerTeamAuthSyncAndMailHandlers(deps: {
   emailService: TeamEmailService
   authService: TeamAuthService
   syncServer: TeamSyncRelayServer
+  getRemoteRelayClient?: () => Promise<TeamRelayHttpClient | null>
 }): void {
-  const { db, emailService, authService, syncServer } = deps
+  const { db, emailService, authService, syncServer, getRemoteRelayClient } = deps
 
   ipcMain.handle('team:getMailConfig', () => emailService.getMailConfig())
 
@@ -30,13 +32,24 @@ export function registerTeamAuthSyncAndMailHandlers(deps: {
 
   ipcMain.handle(
     'team:listActivity',
-    (_event, options: { teamId: string; projectId?: string; limit?: number }) =>
-      db.listActivity(options)
+    async (_event, options: { teamId: string; projectId?: string; limit?: number }) => {
+      const remote = await getRemoteRelayClient?.()
+      if (remote) {
+        return remote.listActivity(options)
+      }
+      return db.listActivity(options)
+    }
   )
 
   ipcMain.handle(
     'team:recordActivity',
-    (_event, entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>) => db.recordActivity(entry)
+    async (_event, entry: Omit<TeamActivityEntry, 'id' | 'createdAt'>) => {
+      const remote = await getRemoteRelayClient?.()
+      if (remote) {
+        return remote.recordActivity(entry)
+      }
+      return db.recordActivity(entry)
+    }
   )
 
   ipcMain.handle('team:getCurrentUser', () => authService.getCurrentUser())
@@ -46,14 +59,26 @@ export function registerTeamAuthSyncAndMailHandlers(deps: {
     (_event, input: { displayName: string; email: string }) => authService.updateUserProfile(input)
   )
 
-  ipcMain.handle('team:requestMagicLinkCode', (_event, email: string, displayName?: string) =>
-    authService.requestMagicLinkCode(email, displayName)
-  )
+  ipcMain.handle('team:requestMagicLinkCode', async (_event, email: string, displayName?: string) => {
+    const remote = await getRemoteRelayClient?.()
+    if (remote) {
+      return remote.requestMagicLinkCode(email, displayName)
+    }
+    return authService.requestMagicLinkCode(email, displayName)
+  })
 
   ipcMain.handle(
     'team:verifyMagicLinkCode',
-    (_event, email: string, code: string, displayName?: string) =>
-      authService.verifyMagicLinkCode(email, code, displayName)
+    async (_event, email: string, code: string, displayName?: string) => {
+      const remote = await getRemoteRelayClient?.()
+      if (remote) {
+        const current = await authService.getCurrentUser()
+        const profile = await remote.verifyMagicLinkCode(email, code, displayName, current.userId)
+        await authService.saveExternalVerifiedProfile(profile)
+        return profile
+      }
+      return authService.verifyMagicLinkCode(email, code, displayName)
+    }
   )
 
   ipcMain.handle('team:getSyncStatus', async () => {

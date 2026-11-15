@@ -138,6 +138,12 @@ export type TeamFactoryEvent =
   | { type: 'updated'; run: FactoryRunRecord }
   | { type: 'removed'; runId: string }
 
+export type TeamDeepLinkJoinPayload = {
+  token: string
+  rawUrl: string
+  relayUrl?: string
+}
+
 export type TeamApi = {
   listConfiguredAgents: (options?: { refresh?: boolean }) => Promise<ConfiguredTeamAgent[]>
   startExecution: (request: TeamStartExecutionRequest) => Promise<AgentExecutionRecord>
@@ -158,6 +164,8 @@ export type TeamApi = {
   getLatestFactoryRunForCard: (cardId: string) => Promise<FactoryRunRecord | null>
   listFactoryRuns: (projectId: string) => Promise<FactoryRunRecord[]>
   onFactoryEvent: (callback: (event: TeamFactoryEvent) => void) => () => void
+  onDeepLinkJoin: (callback: (payload: TeamDeepLinkJoinPayload) => void) => () => void
+  consumePendingDeepLinkJoin: () => Promise<TeamDeepLinkJoinPayload | null>
   getWorkspaceSnapshot: () => Promise<TeamWorkspaceSnapshot>
   createTeam: (input: {
     name: string

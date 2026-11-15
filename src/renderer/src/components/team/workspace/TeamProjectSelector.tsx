@@ -61,6 +61,8 @@ type Props = {
     displayName?: string
   ) => Promise<TeamUserProfile>
   onConfigureSync?: (settings: Partial<TeamSyncSettings>) => Promise<TeamSyncRuntimeStatus>
+  pendingJoinToken?: string | null
+  onClearPendingJoin?: () => void
 }
 
 export function TeamProjectSelector({
@@ -87,12 +89,22 @@ export function TeamProjectSelector({
   onUpdateProfile,
   onRequestMagicCode,
   onVerifyMagicCode,
-  onConfigureSync
+  onConfigureSync,
+  pendingJoinToken = null,
+  onClearPendingJoin
 }: Props): React.JSX.Element {
   const [teamModalOpen, setTeamModalOpen] = useState(false)
   const [projectModalOpen, setProjectModalOpen] = useState(false)
   const [membersModalOpen, setMembersModalOpen] = useState(false)
   const [syncModalOpen, setSyncModalOpen] = useState(false)
+
+  const effectiveMembersModalOpen = membersModalOpen || Boolean(pendingJoinToken)
+  const handleMembersModalOpenChange = (nextOpen: boolean): void => {
+    setMembersModalOpen(nextOpen)
+    if (!nextOpen) {
+      onClearPendingJoin?.()
+    }
+  }
 
   return (
     <div className="flex items-center gap-2 border-b border-border bg-card/40 px-4 py-2">
@@ -231,13 +243,15 @@ export function TeamProjectSelector({
       />
 
       <TeamMembersModal
-        open={membersModalOpen}
+        open={effectiveMembersModalOpen}
         teamName={activeTeam?.name ?? 'Equipo'}
         members={members}
         pendingInvitations={pendingInvitations}
         mailConfig={mailConfig}
         userRole={userRole}
-        onOpenChange={setMembersModalOpen}
+        initialJoinToken={pendingJoinToken}
+        onClearPendingJoin={onClearPendingJoin}
+        onOpenChange={handleMembersModalOpenChange}
         onInviteMember={onInviteMember}
         onResendInvitation={onResendInvitation}
         onRevokeInvitation={onRevokeInvitation}

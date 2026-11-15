@@ -4,6 +4,7 @@ import type { FactoryConfig } from '../../shared/teamwork/team-factory-types'
 import type {
   TeamApi,
   TeamApproveExecutionRequest,
+  TeamDeepLinkJoinPayload,
   TeamExecutionEvent,
   TeamFactoryEvent,
   TeamMailConfigInput,
@@ -61,6 +62,19 @@ export const teamApi: TeamApi = {
       ipcRenderer.removeListener('team:factoryEvent', listener)
     }
   },
+  onDeepLinkJoin: (callback: (payload: TeamDeepLinkJoinPayload) => void): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: TeamDeepLinkJoinPayload
+    ): void => {
+      callback(payload)
+    }
+    ipcRenderer.on('team:deepLinkJoin', listener)
+    return () => {
+      ipcRenderer.removeListener('team:deepLinkJoin', listener)
+    }
+  },
+  consumePendingDeepLinkJoin: () => ipcRenderer.invoke('team:consumePendingDeepLinkJoin'),
   getWorkspaceSnapshot: () => ipcRenderer.invoke('team:getWorkspaceSnapshot'),
   createTeam: (input) => ipcRenderer.invoke('team:createTeam', input),
   createProject: (input) => ipcRenderer.invoke('team:createProject', input),

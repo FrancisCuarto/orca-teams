@@ -7,6 +7,7 @@ import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { useAppStore } from '../../store/index'
 import { openPluginInstallLink } from '../../store/plugins/navigation/plugin-preview-request'
+import { openTeamDeepLinkJoin } from '@/components/team/hooks/team-deep-link-store'
 
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
@@ -60,6 +61,18 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
       .then((link) => {
         if (link) {
           openPluginInstallLink(link)
+        }
+      })
+      .catch(() => {})
+  }
+
+  unsubs.push(window.api.team?.onDeepLinkJoin?.(openTeamDeepLinkJoin) ?? (() => {}))
+  const pendingTeamJoin = window.api.team?.consumePendingDeepLinkJoin?.()
+  if (pendingTeamJoin && typeof pendingTeamJoin.then === 'function') {
+    void pendingTeamJoin
+      .then((payload) => {
+        if (payload) {
+          openTeamDeepLinkJoin(payload)
         }
       })
       .catch(() => {})

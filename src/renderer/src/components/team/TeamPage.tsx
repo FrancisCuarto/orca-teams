@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { Activity, FileText, Kanban, Loader2, PenTool, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TeamTab } from '../../../../shared/teamwork/team-kanban-types'
@@ -15,9 +15,11 @@ import { TeamProjectSelector } from './workspace/TeamProjectSelector'
 import { Button } from '@/components/ui/button'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useActiveRepo } from '@/store/repos/use-repository-catalog'
+import { useTeamDeepLinkJoinStore } from './hooks/team-deep-link-store'
 import { useTeamSyncAndAuth } from './hooks/use-team-sync-and-auth'
 import { useTeamWorkspaceData } from './hooks/use-team-workspace-data'
 import { useTeamWorkspaceRegistry } from './hooks/use-team-workspace-registry'
+import { getTeamPreloadApi } from './hooks/use-team-workspace-registry-actions'
 
 export default function TeamPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TeamTab>('kanban')
@@ -25,14 +27,36 @@ export default function TeamPage(): React.JSX.Element {
   const activeRepo = useActiveRepo()
   const projectPath = activeWorktree?.path ?? activeRepo?.path ?? null
 
+  const pendingJoin = useTeamDeepLinkJoinStore((s) => s.pendingJoin)
+  const setPendingJoin = useTeamDeepLinkJoinStore((s) => s.setPendingJoin)
+
   const syncAndAuth = useTeamSyncAndAuth()
   const registry = useTeamWorkspaceRegistry({
     activeWorktreeId: activeWorktree?.id,
     activeWorktreePath: activeWorktree?.path,
     activeRepoId: activeRepo?.id,
     activeRepoPath: activeRepo?.path,
-    activeRepoDisplayName: activeRepo?.displayName
+    activeRepoDisplayName: activeRepo?.displayName,
+    currentUser: syncAndAuth.user
   })
+
+  useEffect(() => {
+    const teamApi = getTeamPreloadApi()
+    if (!teamApi) {
+      return
+    }
+    const unsub = teamApi.onDeepLinkJoin?.((payload) => {
+      setPendingJoin(payload)
+    })
+    void teamApi.consumePendingDeepLinkJoin?.().then((payload) => {
+      if (payload) {
+        setPendingJoin(payload)
+      }
+    })
+    return () => {
+      unsub?.()
+    }
+  }, [setPendingJoin])
 
   const activeProjectId = registry.currentProject?.id ?? 'proj-default'
 
@@ -128,6 +152,8 @@ export default function TeamPage(): React.JSX.Element {
         onRequestMagicCode={syncAndAuth.requestMagicCode}
         onVerifyMagicCode={syncAndAuth.verifyMagicCode}
         onConfigureSync={syncAndAuth.configureSync}
+        pendingJoinToken={pendingJoin?.token ?? null}
+        onClearPendingJoin={() => setPendingJoin(null)}
       />
 
       <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 border-b border-border bg-card/30">

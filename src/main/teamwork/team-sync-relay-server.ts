@@ -13,7 +13,16 @@ import {
   parseTeamSyncWireMessage,
   type TeamSyncWireMessage
 } from '../../shared/teamwork/realtime/team-ws-transport'
+import { TeamAuthService } from './team-auth-service'
+import { TeamEmailService } from './team-email-service'
 import type { TeamHostDatabase } from './team-host-database'
+import { handleTeamRelayHttpRequest } from './team-sync-relay-http'
+
+export type TeamSyncRelayServerOptions = {
+  userDataDir?: string
+  authService?: TeamAuthService
+  emailService?: TeamEmailService
+}
 
 const SYNC_SETTINGS_FILE = 'orca-team-sync.json'
 const DEFAULT_HOST_PORT = 4789
@@ -56,14 +65,39 @@ export class TeamSyncRelayServer {
   private wss: WebSocketServer | null = null
   private readonly rooms = new Map<string, Set<RoomClient>>()
   private readonly roomDocs = new Map<string, Y.Doc>()
+  private readonly userDataDir?: string
+  private emailService?: TeamEmailService
+  private authService?: TeamAuthService
   private settings: TeamSyncSettings = defaultSyncSettings()
   private hostingUrl: string | null = null
   private lastError: string | undefined
 
   constructor(
     private readonly db: TeamHostDatabase,
-    private readonly userDataDir?: string
-  ) {}
+    userDataDirOrOptions?: string | TeamSyncRelayServerOptions
+  ) {
+    if (typeof userDataDirOrOptions === 'string') {
+      this.userDataDir = userDataDirOrOptions
+    } else if (userDataDirOrOptions) {
+      this.userDataDir = userDataDirOrOptions.userDataDir
+      this.authService = userDataDirOrOptions.authService
+      this.emailService = userDataDirOrOptions.emailService
+    }
+  }
+
+  private getEmailService(): TeamEmailService {
+    if (!this.emailService) {
+      this.emailService = new TeamEmailService({ userDataDir: this.userDataDir })
+    }
+    return this.emailService
+  }
+
+  private getAuthService(): TeamAuthService {
+    if (!this.authService) {
+      this.authService = new TeamAuthService(this.db, this.getEmailService(), this.userDataDir)
+    }
+    return this.authService
+  }
 
   private settingsPath(): string {
     return path.join(this.userDataDir ?? app.getPath('userData'), SYNC_SETTINGS_FILE)
@@ -129,15 +163,25 @@ export class TeamSyncRelayServer {
     await this.stopHosting()
     this.lastError = undefined
 
-    const server = createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(
-        JSON.stringify({
-          service: 'orca-teams-sync-relay',
-          rooms: this.rooms.size,
-          peers: this.countPeers()
-        })
-      )
+    const emailService = this.getEmailService()
+    const authService = this.getAuthService()
+
+    const server = createServer((req, res) => {
+      void handleTeamRelayHttpRequest(req, res, {
+        db: this.db,
+        authService,
+        emailService,
+        roomSecret,
+        getRoomStats: () => ({ rooms: this.rooms.size, peers: this.countPeers() })
+      }).catch((err) => {
+        if (!res.headersSent) {
+          res.writeHead(500, {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json; charset=utf-8'
+          })
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+        }
+      })
     })
 
     const wss = new WebSocketServer({ server })

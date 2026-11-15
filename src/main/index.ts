@@ -1,5 +1,6 @@
 import { app, clipboard, dialog, type BrowserWindow } from 'electron'
 import { isRoutedOrcaDeepLink } from './startup/orca-deep-link-url'
+import { broadcastTeamDeepLinkJoin } from './teamwork/team-deep-link'
 import { createMacAppActivationHandler } from './window/macos-app-activation'
 import { isBackgroundLaunch, isOrcadSidecarLaunch } from './window/foreground-activation-policy'
 import { createDesktopHandoff, desktopHandoffArguments } from './window/macos-desktop-handoff'
@@ -69,6 +70,9 @@ function requestDesktopActivation(argv: readonly string[] = []): void {
   })
   state.pluginInstallLinks.capture(argv, (link) => {
     state.mainWindow?.webContents.send('ui:openPluginInstallLink', link)
+  })
+  state.teamJoinDeepLinks.capture(argv, (payload) => {
+    broadcastTeamDeepLinkJoin(payload)
   })
   state.osOpenedDocuments.capture(argv, publishOsOpenedDocuments)
   // Duplicate serve launches must not activate a desktop on a headless server (#11935).
@@ -168,6 +172,7 @@ if (preflightReady) {
   })
   state.skillShareDeepLinks.capture(process.argv)
   state.pluginInstallLinks.capture(process.argv)
+  state.teamJoinDeepLinks.capture(process.argv)
   // The first renderer pulls on mount; nothing listens this early.
   state.osOpenedDocuments.capture(process.argv)
   registerMainProcessIpcHandlers()
